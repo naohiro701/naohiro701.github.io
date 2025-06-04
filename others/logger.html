@@ -125,8 +125,10 @@
             const layout = {
                 title: "Exponential Growth Plot",
                 xaxis: { title: "Year" },
-                yaxis: { title: "Value" },
-                yaxis: { rangemode: 'tozero' }
+                yaxis: {
+                    title: "Value",
+                    rangemode: 'tozero'
+                }
             };
 
             Plotly.newPlot("plotDiv", data, layout);

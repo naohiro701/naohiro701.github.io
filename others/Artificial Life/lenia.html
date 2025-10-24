@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<title>Lenia (WebGL2, random params + Enter preset)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  html,body{margin:0;height:100%;background:#fff} /* 背景を白 */
+  canvas{width:100vw;height:100vh;display:block;image-rendering:pixelated;background:#fff}
+  .hud{
+    position:fixed;left:8px;top:8px;color:#333;
+    font:12px system-ui,monospace;white-space:pre;mix-blend-mode:normal
+  }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div class="hud" id="hud"></div>
+<script>
+(() => {
+  "use strict";
+
+  // ========== 固定（上書きしないパラメータ） ==========
+  const W = 320*2, H = 180*2;              // 計算格子
+  const seedCount = 24*16*2;
+  const seedRadius = 10;
+
+  // ===== “Enter” で適用するプリセット（ご指定の値） =====
+  const presetEnter = Object.freeze({
+    R: 12,
+    mu: 0.5,
+    sigma: 0.15,
+    m0: 0.15,
+    s: 0.015,
+    dt: 0.2
+  });
+
+  // ========== 乱数サンプリング ==========
+  const randn = () => {
+    const u = 1 - Math.random(), v = 1 - Math.random();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  };
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+
+  // 論文帯域に寄せたサンプル（必要に応じて調整可）
+  const sampleParamsFromPaper = () => {
+    const mu = clamp(0.35 + 0.10 * randn(), 0.15, 0.60);
+    const sigma = clamp(Math.exp(Math.log(0.03) + 0.35 * randn()), 0.01, 0.10);
+    const R = 8 + (Math.random() * (24 - 8 + 1) | 0);
+    const dt = 0.08 + Math.random() * (0.30 - 0.08);
+    // 成長写像側（既定形状）
+    const m0 = 0.15, s = 0.015;
+    return { mu, sigma, R, dt, m0, s };
+  };
+
+  // ========== Canvas / GL ==========
+  const cvs = document.getElementById("view");
+  const hud = document.getElementById("hud");
+  const gl = cvs.getContext("webgl2", {
+    alpha:false, antialias:false, desynchronized:true, preserveDrawingBuffer:false
+  });
+  if (!gl) { throw new Error("WebGL2 not available"); }
+  const resize = () => { cvs.width = W; cvs.height = H; gl.viewport(0,0,W,H); };
+  resize(); addEventListener("resize", resize);
+  gl.getExtension('EXT_color_buffer_float');
+  gl.getExtension('OES_texture_float_linear');
+
+  // ========== シェーダ ==========
+  const vert = `#version 300 es
+  precision highp float;
+  const vec2 pos[4]=vec2[4](vec2(-1.,-1.),vec2(1.,-1.),vec2(-1.,1.),vec2(1.,1.));
+  out vec2 vTex;
+  void main(){ gl_Position=vec4(pos[gl_VertexID],0.,1.); vTex=(pos[gl_VertexID]*0.5)+0.5; }`;
+
+  // ステップ：畳み込み→成長→クリップ（結果はRチャンネル）
+  const fragStep = `#version 300 es
+  precision highp float;
+  in vec2 vTex; out vec4 outColor;
+  uniform sampler2D uA;
+  uniform vec2  uTexel;
+  uniform int   uR;
+  uniform float uMu, uSigma, uM0, uS, uDt, uKscale;
+  void main(){
+    float acc = 0.0;
+    float rInv = 1.0 / float(uR);
+    float sig2 = uSigma*uSigma;
+    for (int dv=-64; dv<=64; ++dv){
+      if (dv < -uR || dv > uR) continue;
+      for (int du=-64; du<=64; ++du){
+        if (du < -uR || du > uR) continue;
+        float rr = length(vec2(float(du), float(dv))) * rInv;
+        if (rr > 1.0) continue;
+        float kraw = exp(-0.5 * ((rr - uMu)*(rr - uMu)) / sig2);
+        vec2 ofs = vec2(float(du), float(dv)) * uTexel;
+        float a = texture(uA, vTex + ofs).r;
+        acc += a * kraw;
+      }
+    }
+    float U = acc * uKscale;
+    float A = texture(uA, vTex).r;
+    float g = 2.0 * exp( - (U - uM0)*(U - uM0) / (2.0*uS*uS) ) - 1.0;
+    float B = clamp(A + uDt * g, 0.0, 1.0);
+    outColor = vec4(B, 0.0, 0.0, 1.0);
+  }`;
+
+  // 描画：背景白、前景 #6c5ce7 へ線形補間
+  const fragDraw = `#version 300 es
+  precision highp float;
+  in vec2 vTex; out vec4 outColor;
+  uniform sampler2D uTex;
+  uniform vec3 uBg;  // 背景（白）
+  uniform vec3 uFg;  // 生物色（#6c5ce7）
+  void main(){
+    float v = texture(uTex, vTex).r;        // 0..1
+    vec3 col = mix(uBg, uFg, v);            // v=0→背景、v=1→前景
+    outColor = vec4(col, 1.0);
+  }`;
+
+  const compile = (type, src) => {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      throw new Error(gl.getShaderInfoLog(s) || "shader compile failed");
+    }
+    return s;
+  };
+  const link = (vs, fs) => {
+    const p = gl.createProgram();
+    gl.attachShader(p, vs); gl.attachShader(p, fs);
+    gl.bindAttribLocation(p, 0, "pos"); // dummy
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+      throw new Error(gl.getProgramInfoLog(p) || "program link failed");
+    }
+    return p;
+  };
+
+  const progStep = link(compile(gl.VERTEX_SHADER, vert), compile(gl.FRAGMENT_SHADER, fragStep));
+  const progDraw = link(compile(gl.VERTEX_SHADER, vert), compile(gl.FRAGMENT_SHADER, fragDraw));
+
+  // ========== Ping-Pong ==========
+  const makeTex = () => {
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, W, H, 0, gl.RGBA, gl.FLOAT, null);
+    return t;
+  };
+  const makeFBO = (tex) => {
+    const f = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE) {
+      throw new Error("FBO incomplete");
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return f;
+  };
+
+  const texA = makeTex();
+  const texB = makeTex();
+  const fboA = makeFBO(texA);
+  const fboB = makeFBO(texB);
+
+  // ========== シード生成 ==========
+  const fieldRGBA = new Float32Array(W*H*4);
+  const seedCPU = new Float32Array(W*H);
+  const mod = (a,m)=>{const r=a%m;return r<0?r+m:r;};
+  const putSeed = (buf) => {
+    for (let n=0; n<seedCount; n++){
+      const cx = (Math.random()*W)|0;
+      const cy = (Math.random()*H)|0;
+      for (let y=-seedRadius; y<=seedRadius; y++){
+        for (let x=-seedRadius; x<=seedRadius; x++){
+          const r2 = x*x + y*y;
+          if (r2 > seedRadius*seedRadius) continue;
+          const X = mod(cx + x, W);
+          const Y = mod(cy + y, H);
+          const idx = Y*W + X;
+          const w = Math.exp(-r2 / (2*(seedRadius*seedRadius*0.35)));
+          const v = Math.min(1, buf[idx] + 0.8*w);
+          buf[idx] = v;
+        }
+      }
+    }
+  };
+  const uploadSeed = (targetTex) => {
+    seedCPU.fill(0);
+    putSeed(seedCPU);
+    for (let i=0;i<W*H;i++){
+      const v = seedCPU[i];
+      const j = i*4;
+      fieldRGBA[j  ] = v;
+      fieldRGBA[j+1] = 0;
+      fieldRGBA[j+2] = 0;
+      fieldRGBA[j+3] = 1;
+    }
+    gl.bindTexture(gl.TEXTURE_2D, targetTex);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, W, H, gl.RGBA, gl.FLOAT, fieldRGBA);
+  };
+
+  // ========== Uniform ロケーション ==========
+  const locStep = Object.freeze({
+    uA: gl.getUniformLocation(progStep,"uA"),
+    uTexel: gl.getUniformLocation(progStep,"uTexel"),
+    uR: gl.getUniformLocation(progStep,"uR"),
+    uMu: gl.getUniformLocation(progStep,"uMu"),
+    uSigma: gl.getUniformLocation(progStep,"uSigma"),
+    uM0: gl.getUniformLocation(progStep,"uM0"),
+    uS: gl.getUniformLocation(progStep,"uS"),
+    uDt: gl.getUniformLocation(progStep,"uDt"),
+    uKscale: gl.getUniformLocation(progStep,"uKscale"),
+  });
+  const locDraw = Object.freeze({
+    uTex: gl.getUniformLocation(progDraw,"uTex"),
+    uBg:  gl.getUniformLocation(progDraw,"uBg"),
+    uFg:  gl.getUniformLocation(progDraw,"uFg"),
+  });
+
+  // ========== VAO ==========
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+
+  // ========== カーネル L1 正規化係数 ==========
+  const computeKscale = (R, mu, sigma) => {
+    let ksum = 0.0;
+    const invR = 1.0 / R;
+    for (let j=-R;j<=R;j++){
+      for (let i=-R;i<=R;i++){
+        const rr = Math.hypot(i, j) * invR;
+        if (rr<=1.0){
+          const v = Math.exp(-0.5 * ((rr - mu)*(rr - mu)) / (sigma*sigma));
+          ksum += v;
+        }
+      }
+    }
+    return 1.0 / (ksum || 1.0);
+  };
+
+  // ========== 描画色（背景=白, 生物=#6c5ce7） ==========
+  const bgColor = [1.0, 1.0, 1.0];
+  const fgColor = [108/255, 92/255, 231/255];
+
+  // ========== パラメータ適用 ==========
+  const applyParams = (p, doReseed=true) => {
+    if (doReseed) uploadSeed(texA); // texA を初期化
+    gl.useProgram(progStep);
+    gl.uniform1i(locStep.uA, 0);
+    gl.uniform2f(locStep.uTexel, 1.0/W, 1.0/H);
+    gl.uniform1i(locStep.uR, p.R);
+    gl.uniform1f(locStep.uMu, p.mu);
+    gl.uniform1f(locStep.uSigma, p.sigma);
+    gl.uniform1f(locStep.uM0, p.m0);
+    gl.uniform1f(locStep.uS,  p.s);
+    gl.uniform1f(locStep.uDt, p.dt);
+    gl.uniform1f(locStep.uKscale, computeKscale(p.R, p.mu, p.sigma));
+
+    gl.useProgram(progDraw);
+    gl.uniform3f(locDraw.uBg, bgColor[0], bgColor[1], bgColor[2]);
+    gl.uniform3f(locDraw.uFg, fgColor[0], fgColor[1], fgColor[2]);
+
+    hud.textContent =
+`
+R=${p.R}  μ=${p.mu.toFixed(3)}  σ=${p.sigma.toFixed(3)}
+m0=${p.m0}  s=${p.s}
+Δt=${p.dt.toFixed(3)}
+`;
+  };
+
+  // ========== ループ ==========
+  let srcTex = texA, dstTex = texB, srcFBO = fboA, dstFBO = fboB;
+  let simParams = sampleParamsFromPaper();
+  applyParams(simParams, true);
+
+  const step = () => {
+    // 1) update: texA -> texB
+    gl.useProgram(progStep);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, dstFBO);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, srcTex);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    // 2) draw: texB -> screen
+    gl.useProgram(progDraw);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, dstTex);
+    gl.uniform1i(locDraw.uTex, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    // ping-pong
+    { const tt = srcTex; srcTex = dstTex; dstTex = tt; }
+    { const ff = srcFBO; srcFBO = dstFBO; dstFBO = ff; }
+
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+
+  // ========== 入力 ==========
+  const reseedOnly = () => { uploadSeed(srcTex); };
+  const resampleAndReseed = () => {
+    const p = sampleParamsFromPaper();
+    simParams = p;
+    applyParams(simParams, true);
+  };
+  const applyEnterPreset = () => {
+    // ご指定の定数セットを適用（+ 再シード）
+    simParams = {
+      R: presetEnter.R,
+      mu: presetEnter.mu,
+      sigma: presetEnter.sigma,
+      m0: presetEnter.m0,
+      s:  presetEnter.s,
+      dt: presetEnter.dt
+    };
+    applyParams(simParams, true);
+  };
+
+  cvs.addEventListener('click', reseedOnly);
+  addEventListener('keydown', (e) => {
+    if (e.key === 'r' || e.key === 'R') resampleAndReseed();
+    if (e.key === 'Enter') applyEnterPreset(); // ← 裏技：Enter でご指定値に切替
+  });
+})();
+</script>
+</body>
+</html>

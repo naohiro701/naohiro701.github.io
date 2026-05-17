@@ -1,0 +1,1529 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Japan Power System — Dispatch &amp; Residual Load · Today</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#051C2A; --blue:#163E93; --cyan:#30A3DA; --ink:#060200;
+  --paper:#FFFFFF;
+  --rule:rgba(5,28,42,0.12);
+  --rule-soft:rgba(5,28,42,0.06);
+  --muted:rgba(5,28,42,0.55);
+  --warn:#C84B31; --good:#2E8B57;
+  --serif:'Newsreader',Georgia,serif;
+  --sans:'IBM Plex Sans',-apple-system,sans-serif;
+  --mono:'IBM Plex Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1440px;margin:0 auto;padding:0 48px 64px}
+
+.mast{display:grid;grid-template-columns:auto 1fr auto;gap:32px;align-items:end;padding:28px 0 18px;border-bottom:2px solid var(--navy)}
+.mast-mark{font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:var(--navy);font-weight:500}
+.mast-mark::before{content:"";display:inline-block;width:10px;height:10px;background:var(--cyan);margin-right:10px;vertical-align:1px}
+.mast h1{font-family:var(--serif);font-weight:400;font-size:34px;line-height:1.05;color:var(--navy);letter-spacing:-.01em}
+.mast h1 em{font-style:italic;color:var(--blue)}
+.mast-meta{text-align:right;font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted)}
+.mast-meta b{display:block;color:var(--navy);font-size:13px;letter-spacing:.05em;margin-bottom:2px}
+.deck{padding:14px 0 26px;border-bottom:1px solid var(--rule);font-family:var(--serif);font-size:15px;font-style:italic;color:var(--muted);max-width:920px;line-height:1.55}
+.deck b{color:var(--navy);font-style:normal;font-weight:500}
+.live{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(48,163,218,.1);color:var(--navy);font-weight:500;letter-spacing:.06em}
+.live-dot{width:6px;height:6px;background:var(--cyan);border-radius:50%;animation:pulse 1.8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+.control-bar{margin-top:22px;display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--navy);color:var(--paper)}
+.cb-label{font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:rgba(255,255,255,.6);font-weight:500}
+.cb-select{font-family:var(--sans);font-size:14px;font-weight:500;background:transparent;color:var(--paper);border:none;border-bottom:1px solid rgba(255,255,255,.4);padding:4px 24px 4px 0;cursor:pointer;outline:none;appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'><path d='M0 0 L4 5 L8 0 Z' fill='white'/></svg>");background-repeat:no-repeat;background-position:right center}
+.cb-select:focus{border-bottom-color:var(--cyan)}
+.cb-select option{background:var(--navy);color:var(--paper)}
+.cb-stat{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:rgba(255,255,255,.75)}
+.cb-stat b{color:var(--paper);font-weight:500}
+
+.control-bar-2{display:flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(5,28,42,.04);border-left:3px solid var(--cyan);flex-wrap:wrap}
+.cb-label-2{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--muted);font-weight:500;margin-right:2px}
+.rb{padding:5px 11px;border:1px solid var(--rule);background:var(--paper);color:var(--navy);cursor:pointer;font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;transition:all .15s}
+.rb:hover{border-color:var(--navy)}
+.rb.act{background:var(--navy);color:var(--paper);border-color:var(--navy)}
+.cb-divider{width:1px;height:20px;background:var(--rule);margin:0 4px}
+.control-bar-2 .cb-stat{color:var(--muted)}
+.control-bar-2 .cb-stat b{color:var(--navy)}
+
+.exhibit{margin-top:40px}
+.ex-head{display:flex;align-items:baseline;gap:18px;border-bottom:1px solid var(--rule);padding-bottom:8px;margin-bottom:18px}
+.ex-num{font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:var(--cyan);font-weight:600}
+.ex-title{font-family:var(--serif);font-size:20px;font-weight:500;color:var(--navy);letter-spacing:-.005em}
+.ex-sub{font-family:var(--sans);font-size:12px;color:var(--muted);margin-left:auto;letter-spacing:.02em}
+
+.kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule)}
+.kpi{background:var(--paper);padding:16px 18px}
+.kpi-lab{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase;margin-bottom:8px;line-height:1.3}
+.kpi-val{font-family:var(--serif);font-size:28px;font-weight:500;color:var(--navy);line-height:1;letter-spacing:-.015em}
+.kpi-val .u{font-family:var(--sans);font-size:12px;font-weight:400;color:var(--muted);margin-left:4px;letter-spacing:0}
+.kpi-delta{margin-top:8px;font-family:var(--mono);font-size:10.5px;color:var(--muted);line-height:1.4}
+.kpi-delta.up{color:var(--warn)} .kpi-delta.dn{color:var(--good)}
+.kpi-spark{margin-top:8px;height:22px;width:100%}
+
+.disp-card{border:1px solid var(--rule);padding:20px 20px 16px;background:var(--paper);display:grid;grid-template-columns:1fr 260px;gap:24px}
+.disp-svg{width:100%;height:440px;display:block}
+.carrier-legend{font-family:var(--mono);font-size:10.5px;display:flex;flex-direction:column;gap:0;padding-top:6px}
+.carrier-row{display:grid;grid-template-columns:12px 1fr auto auto;gap:8px;align-items:center;padding:5px 0;border-bottom:1px dotted var(--rule-soft)}
+.carrier-row .sw{height:10px;width:12px}
+.carrier-row .nm{color:var(--navy);letter-spacing:.02em}
+.carrier-row .gw{color:var(--ink);font-weight:500;text-align:right}
+.carrier-row .pc{color:var(--muted);text-align:right;font-size:9.5px;min-width:32px}
+.carrier-group{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:var(--muted);text-transform:uppercase;padding:10px 0 4px;border-bottom:1px solid var(--rule)}
+.carrier-group:first-child{padding-top:0}
+
+.two-up{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.three-up{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:24px}
+.chart-card{border:1px solid var(--rule);padding:20px;background:var(--paper)}
+.chart-svg{width:100%;height:280px;display:block}
+
+.donut-wrap{display:grid;grid-template-columns:200px 1fr;gap:20px;align-items:center}
+.donut-svg{width:200px;height:200px}
+
+.region-matrix{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule)}
+.rm-cell{background:var(--paper);padding:12px 14px;cursor:pointer;transition:background .15s}
+.rm-cell:hover{background:rgba(48,163,218,.05)}
+.rm-cell.active{background:rgba(48,163,218,.10);box-shadow:inset 0 0 0 2px var(--cyan)}
+.rm-name{font-family:var(--serif);font-size:14px;font-weight:500;color:var(--navy);margin-bottom:2px}
+.rm-meta{font-family:var(--mono);font-size:9.5px;color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between}
+.rm-svg{width:100%;height:64px;display:block}
+.rm-foot{font-family:var(--mono);font-size:9.5px;color:var(--ink);margin-top:6px;display:flex;justify-content:space-between}
+.rm-foot .v{color:var(--navy);font-weight:500}
+
+.references{margin-top:40px;padding:20px 0 16px;border-top:1px solid var(--rule);font-size:11.5px;color:var(--muted);line-height:1.8}
+.references h4{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--navy);margin-bottom:12px;font-weight:600}
+.tso-list{list-style:none;padding:0;display:grid;grid-template-columns:repeat(2,1fr);gap:4px 28px}
+.tso-list li{padding:3px 0;border-bottom:1px dotted var(--rule-soft);display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tso-list a{color:var(--blue);text-decoration:none;font-family:var(--mono);font-size:10.5px}
+.tso-list a:hover{color:var(--cyan);text-decoration:underline}
+.src-note{margin:0 0 14px;padding:8px 12px;background:rgba(48,163,218,.08);border-left:3px solid var(--cyan);font-size:11px;color:var(--ink);line-height:1.6}
+
+/* Tooltip */
+.tooltip{position:fixed;pointer-events:none;background:var(--navy);color:var(--paper);padding:10px 14px;font-family:var(--mono);font-size:10.5px;line-height:1.55;display:none;z-index:1000;max-width:340px;border-left:3px solid var(--cyan);box-shadow:0 6px 20px rgba(5,28,42,.25);transition:opacity .08s}
+.tooltip.show{display:block}
+.tooltip h5{font-family:'IBM Plex Sans',sans-serif;font-size:11.5px;color:var(--cyan);margin-bottom:7px;letter-spacing:.04em;font-weight:500;border-bottom:1px solid rgba(255,255,255,.15);padding-bottom:5px}
+.tooltip table{border-collapse:collapse;width:100%;font-size:10.5px}
+.tooltip td{padding:1.5px 6px 1.5px 0;vertical-align:middle}
+.tooltip td.r{text-align:right;font-weight:500;white-space:nowrap}
+.tooltip td.r b{color:var(--cyan);font-weight:500}
+.tooltip .sw{display:inline-block;width:9px;height:9px;margin-right:6px;vertical-align:0px}
+.tooltip .sep{height:5px}
+.tooltip .neg{color:#ffb59a}
+.tooltip .pos{color:#9be2c2}
+.svg-hover{cursor:crosshair}
+
+.btn{padding:5px 11px;border:1px solid var(--rule);background:var(--paper);color:var(--navy);cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:.08em;transition:all .15s}
+.btn:hover{border-color:var(--navy)}
+.btn.act{background:var(--navy);color:var(--paper);border-color:var(--navy)}
+
+@media (max-width:1100px){
+  .wrap{padding:0 24px 48px}
+  .kpi-row{grid-template-columns:repeat(2,1fr)}
+  .region-matrix{grid-template-columns:repeat(2,1fr)}
+  .disp-card{grid-template-columns:1fr}
+  .two-up,.three-up{grid-template-columns:1fr}
+  .mast{grid-template-columns:1fr;gap:12px}
+  .mast-meta{text-align:left}
+  .foot{grid-template-columns:1fr}
+  .control-bar{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <div class="mast-mark">需給速報</div>
+  <h1>電力の供給実績</h1>
+  <div class="mast-meta">
+    <b id="m-date">&mdash;</b>
+    <span id="m-time">&mdash;</span> JST<br>
+    <span class="live"><span class="live-dot"></span>5分粒度 実績</span>
+  </div>
+</header>
+
+<div class="control-bar">
+  <div class="cb-label">地域</div>
+  <select id="region-select" class="cb-select">
+    <option value="national">全国</option>
+    <option value="hokkaido">北海道</option>
+    <option value="tohoku">東北</option>
+    <option value="tokyo">東京</option>
+    <option value="chubu">中部</option>
+    <option value="hokuriku">北陸</option>
+    <option value="kansai">関西</option>
+    <option value="chugoku">中国</option>
+    <option value="shikoku">四国</option>
+    <option value="kyushu">九州</option>
+    <option value="okinawa">沖縄</option>
+  </select>
+  <div class="cb-stat" style="margin-left:auto" id="cb-now">現在 &mdash;</div>
+  <div class="cb-stat" id="cb-cap">設備容量 &mdash;</div>
+</div>
+
+<div class="control-bar-2">
+  <div class="cb-label-2">表示時間帯</div>
+  <button class="rb act" data-range="0,24">全日</button>
+  <button class="rb" data-range="elapsed">経過</button>
+  <button class="rb" data-range="0,12">前半</button>
+  <button class="rb" data-range="12,24">後半</button>
+  <button class="rb" data-range="now">現在拡大</button>
+  <div class="cb-divider"></div>
+  <div class="cb-label-2">縦軸</div>
+  <button class="rb yb act" data-yfit="auto">自動</button>
+  <button class="rb yb" data-yfit="fixed">固定</button>
+  <div class="cb-stat" style="margin-left:auto" id="cb-range">範囲 0:00 &ndash; 24:00</div>
+</div>
+
+<section class="exhibit">
+  <div class="ex-head">
+    <div class="ex-num">図1</div>
+    <div class="ex-title">系統概況</div>
+  </div>
+  <div class="kpi-row" id="kpi-row"></div>
+</section>
+
+<section class="exhibit">
+  <div class="ex-head">
+    <div class="ex-num">図2</div>
+    <div class="ex-title">電源別給電</div>
+  </div>
+  <div class="disp-card">
+    <div>
+      <svg class="disp-svg" id="disp-svg" viewBox="0 0 980 440" preserveAspectRatio="none"></svg>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center;font-family:var(--mono);font-size:10px">
+        <button class="btn act" data-unit="gw">GW</button>
+        <button class="btn" data-unit="share">比率</button>
+      </div>
+    </div>
+    <div class="carrier-legend" id="carrier-legend"></div>
+  </div>
+</section>
+
+<section class="exhibit">
+  <div class="ex-head">
+    <div class="ex-num">図3</div>
+    <div class="ex-title">残余需要・負荷持続曲線</div>
+  </div>
+  <div class="two-up">
+    <div class="chart-card">
+      <svg class="chart-svg" id="resid-svg" viewBox="0 0 700 280" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="chart-card">
+      <svg class="chart-svg" id="ldc-svg" viewBox="0 0 700 280" preserveAspectRatio="none"></svg>
+    </div>
+  </div>
+</section>
+
+<section class="exhibit">
+  <div class="ex-head">
+    <div class="ex-num">図4</div>
+    <div class="ex-title">電力量・設備利用率・排出原単位</div>
+  </div>
+  <div class="three-up">
+    <div class="chart-card">
+      <div class="donut-wrap">
+        <svg class="donut-svg" id="donut-svg" viewBox="0 0 200 200"></svg>
+        <div id="donut-legend" style="font-family:var(--mono);font-size:10px;display:flex;flex-direction:column;gap:3px"></div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <svg class="chart-svg" id="cf-svg" viewBox="0 0 360 280" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="chart-card">
+      <svg class="chart-svg" id="co2-svg" viewBox="0 0 360 280" preserveAspectRatio="none"></svg>
+    </div>
+  </div>
+</section>
+
+<section class="references">
+  <h4>出典</h4>
+  <p class="src-note">需要・電源別出力・予備率は各送配電事業者でんき予報CSVから取得。集約値・需給ひっ迫情報はOCCTO系統情報公表サイトを参照。</p>
+  <ul class="tso-list">
+    <li>電力広域的運営推進機関 OCCTO &mdash; <a href="https://occtonet.occto.or.jp/" target="_blank" rel="noopener">https://occtonet.occto.or.jp/</a></li>
+    <li>北海道電力ネットワーク &mdash; <a href="https://denkiyoho.hepco.co.jp/" target="_blank" rel="noopener">https://denkiyoho.hepco.co.jp/</a></li>
+    <li>東北電力ネットワーク &mdash; <a href="https://setsuden.nw.tohoku-epco.co.jp/" target="_blank" rel="noopener">https://setsuden.nw.tohoku-epco.co.jp/</a></li>
+    <li>東京電力パワーグリッド &mdash; <a href="https://www.tepco.co.jp/forecast/" target="_blank" rel="noopener">https://www.tepco.co.jp/forecast/</a></li>
+    <li>中部電力パワーグリッド &mdash; <a href="https://powergrid.chuden.co.jp/denkiyoho/" target="_blank" rel="noopener">https://powergrid.chuden.co.jp/denkiyoho/</a></li>
+    <li>北陸電力送配電 &mdash; <a href="https://www.rikuden.co.jp/denkiyoho/" target="_blank" rel="noopener">https://www.rikuden.co.jp/denkiyoho/</a></li>
+    <li>関西電力送配電 &mdash; <a href="https://www.kansai-td.co.jp/denkiyoho/" target="_blank" rel="noopener">https://www.kansai-td.co.jp/denkiyoho/</a></li>
+    <li>中国電力ネットワーク &mdash; <a href="https://www.energia.co.jp/nw/jukyuu/" target="_blank" rel="noopener">https://www.energia.co.jp/nw/jukyuu/</a></li>
+    <li>四国電力送配電 &mdash; <a href="https://www.yonden.co.jp/nw/denkiyoho/" target="_blank" rel="noopener">https://www.yonden.co.jp/nw/denkiyoho/</a></li>
+    <li>九州電力送配電 &mdash; <a href="https://www.kyuden.co.jp/td_power_usages/" target="_blank" rel="noopener">https://www.kyuden.co.jp/td_power_usages/</a></li>
+    <li>沖縄電力 &mdash; <a href="https://www.okiden.co.jp/denki2/" target="_blank" rel="noopener">https://www.okiden.co.jp/denki2/</a></li>
+  </ul>
+</section>
+
+</div>
+
+<div id="tooltip" class="tooltip"></div>
+
+<script>
+/* ============ COLORS ============ */
+const NAVY='#051C2A', BLUE='#163E93', CYAN='#30A3DA', INK='#060200';
+
+/* ============ CARRIERS (電源定義・慣用配色) ============ */
+const CARRIERS = [
+  {k:'nuclear',    nm:'原子力',     grp:'低炭素ベース', cap:12,  ci:0,   color:'#ff8c00'},
+  {k:'geothermal', nm:'地熱',       grp:'低炭素ベース', cap:0.6, ci:0,   color:'#ba91b1'},
+  {k:'hydro',      nm:'水力',       grp:'低炭素ベース', cap:22,  ci:0,   color:'#298c81'},
+  {k:'biomass',    nm:'バイオマス', grp:'低炭素ベース', cap:8,   ci:230, color:'#baa741'},
+  {k:'solar',      nm:'太陽光',     grp:'再エネ変動',   cap:90,  ci:0,   color:'#f9d002'},
+  {k:'wind',       nm:'風力',       grp:'再エネ変動',   cap:8,   ci:0,   color:'#235ebc'},
+  {k:'coal',       nm:'石炭',       grp:'火力',         cap:45,  ci:900, color:'#545454'},
+  {k:'lng',        nm:'天然ガス',   grp:'火力',         cap:80,  ci:450, color:'#a85522'},
+  {k:'oil',        nm:'石油',       grp:'火力',         cap:25,  ci:740, color:'#262626'},
+  {k:'pumped',     nm:'揚水',       grp:'蓄電',         cap:28,  ci:0,   color:'#51dbcc'},
+];
+
+/* ============ REGIONS ============ */
+const REGIONS = [
+  {key:'hokkaido',name:'北海道',cap:5.8},
+  {key:'tohoku',  name:'東北',  cap:14.0},
+  {key:'tokyo',   name:'東京',  cap:55.0},
+  {key:'chubu',   name:'中部',  cap:26.0},
+  {key:'hokuriku',name:'北陸',  cap:5.5},
+  {key:'kansai',  name:'関西',  cap:28.0},
+  {key:'chugoku', name:'中国',  cap:11.5},
+  {key:'shikoku', name:'四国',  cap:5.2},
+  {key:'kyushu',  name:'九州',  cap:16.5},
+  {key:'okinawa', name:'沖縄',  cap:1.6},
+];
+const TOTAL_DEMAND_CAP = REGIONS.reduce((s,r)=>s+r.cap,0);
+
+/* Per-region carrier installed-capacity SHARE (sums to ~1.0 per carrier across all regions).
+   Demand share = cap / TOTAL. Reflects: nuclear heavily in KEPCO/KYUDEN/YONDEN,
+   solar/geo heavy in Kyushu, wind in Tohoku/Hokkaido, LNG in Tokyo, oil in Okinawa. */
+const REGION_MIX = {
+  hokkaido:{dem:0.034, nuclear:0.00, geothermal:0.15, hydro:0.03, biomass:0.05, solar:0.03, wind:0.25, coal:0.07, lng:0.02, oil:0.04, pumped:0.03},
+  tohoku:  {dem:0.083, nuclear:0.00, geothermal:0.25, hydro:0.28, biomass:0.15, solar:0.10, wind:0.35, coal:0.17, lng:0.04, oil:0.05, pumped:0.10},
+  tokyo:   {dem:0.325, nuclear:0.00, geothermal:0.00, hydro:0.08, biomass:0.20, solar:0.22, wind:0.03, coal:0.13, lng:0.40, oil:0.15, pumped:0.32},
+  chubu:   {dem:0.154, nuclear:0.00, geothermal:0.03, hydro:0.28, biomass:0.15, solar:0.14, wind:0.03, coal:0.22, lng:0.18, oil:0.15, pumped:0.15},
+  hokuriku:{dem:0.033, nuclear:0.00, geothermal:0.00, hydro:0.15, biomass:0.03, solar:0.02, wind:0.02, coal:0.03, lng:0.02, oil:0.03, pumped:0.03},
+  kansai:  {dem:0.166, nuclear:0.66, geothermal:0.00, hydro:0.07, biomass:0.15, solar:0.13, wind:0.02, coal:0.08, lng:0.19, oil:0.15, pumped:0.25},
+  chugoku: {dem:0.068, nuclear:0.00, geothermal:0.03, hydro:0.03, biomass:0.10, solar:0.10, wind:0.08, coal:0.15, lng:0.07, oil:0.05, pumped:0.04},
+  shikoku: {dem:0.031, nuclear:0.09, geothermal:0.02, hydro:0.03, biomass:0.05, solar:0.04, wind:0.03, coal:0.04, lng:0.03, oil:0.03, pumped:0.03},
+  kyushu:  {dem:0.098, nuclear:0.25, geothermal:0.50, hydro:0.05, biomass:0.10, solar:0.20, wind:0.15, coal:0.10, lng:0.05, oil:0.05, pumped:0.05},
+  okinawa: {dem:0.0095,nuclear:0.00, geothermal:0.02, hydro:0.00, biomass:0.02, solar:0.02, wind:0.04, coal:0.01, lng:0.00, oil:0.30, pumped:0.00},
+};
+const REGION_LABELS = {
+  national:'全国', hokkaido:'北海道', tohoku:'東北', tokyo:'東京',
+  chubu:'中部', hokuriku:'北陸', kansai:'関西', chugoku:'中国',
+  shikoku:'四国', kyushu:'九州', okinawa:'沖縄',
+};
+
+/* ============ UTILS ============ */
+function ymd(){const d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');}
+function mulberry32(a){return function(){var t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;}}
+function slotLabel(s){return `${String(Math.floor(s/12)).padStart(2,'0')}:${String((s%12)*5).padStart(2,'0')}`}
+function nowSlotIdx(){const d=new Date();return Math.min(287, d.getHours()*12 + Math.floor(d.getMinutes()/5));}
+function dateLabel(){
+  const d = new Date();
+  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+}
+function timeLabel(){
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function monthFactor(){
+  const m = new Date().getMonth()+1;
+  return {
+    demandMult:[0,1.10,1.05,0.95,0.85,0.78,0.85,1.05,1.10,1.00,0.88,0.92,1.05][m],
+    solarMult: [0,0.55,0.65,0.85,1.05,1.20,1.15,1.00,1.00,0.95,0.80,0.60,0.50][m],
+    windMult:  [0,1.15,1.10,1.00,0.95,0.85,0.75,0.70,0.80,0.90,1.05,1.15,1.20][m],
+  };
+}
+
+/* ============ BASE CURVES (national pre-curtailment) ============ */
+function demandCurve(){
+  const mf = monthFactor();
+  const rng = mulberry32(parseInt(ymd()));
+  const peakNat = TOTAL_DEMAND_CAP * 0.65 * mf.demandMult;
+  const arr=[];
+  for(let i=0;i<288;i++){
+    const h = i/12;
+    const morn  = Math.exp(-Math.pow((h-9 )/1.8,2)) * 0.30;
+    const eve   = Math.exp(-Math.pow((h-19)/1.7,2)) * 0.42;
+    const lunch = Math.exp(-Math.pow((h-12.5)/0.6,2))*-0.06;
+    const night = Math.exp(-Math.pow((h-3.5)/2.5,2))*-0.20;
+    const noise = (rng()-0.5)*0.015;
+    const ratio = Math.max(0.40, 0.62 + morn + eve + lunch + night + noise);
+    arr.push(peakNat * ratio);
+  }
+  return arr;
+}
+function solarAvail(){
+  const mf = monthFactor();
+  const rng = mulberry32(parseInt(ymd())+7);
+  const sunrise = 5.0, sunset = 18.7;
+  const peakAC = CARRIERS.find(c=>c.k==='solar').cap * 0.50 * mf.solarMult;
+  const arr=[];
+  let cloud = 1.0;
+  for(let i=0;i<288;i++){
+    if(i%6===0) cloud = 0.78 + rng()*0.22;
+    const h = i/12;
+    let v=0;
+    if(h>sunrise && h<sunset){
+      const noon = (sunrise+sunset)/2;
+      const half = (sunset-sunrise)/2;
+      v = Math.cos(Math.PI*(h-noon)/(2*half));
+      v = Math.max(0, v) * peakAC * cloud;
+    }
+    arr.push(v);
+  }
+  return arr;
+}
+function windAvail(){
+  const mf = monthFactor();
+  const rng = mulberry32(parseInt(ymd())+13);
+  const cap = CARRIERS.find(c=>c.k==='wind').cap;
+  const meanCF = 0.30 * mf.windMult;
+  const arr=[];
+  let w = meanCF + (rng()-0.5)*0.1;
+  for(let i=0;i<288;i++){
+    if(i%12===0) w = Math.max(0.05, Math.min(0.85, w + (rng()-0.5)*0.12));
+    const v = cap * (w + (rng()-0.5)*0.04);
+    arr.push(Math.max(0,v));
+  }
+  return arr;
+}
+
+/* ============ INTERCONNECT CAPACITY (GW, bi-directional, approx 2024) ============ */
+const ICAP = {
+  national: 0,        // 国全体は島嶼系統 (海外連系なし)
+  hokkaido: 0.9,      // 北本連系
+  tohoku:   5.0,      // 東京方面
+  tokyo:    5.6,      // 東北 + FC経由で中部
+  chubu:    4.3,      // FC経由で東京 + 関西方面
+  hokuriku: 1.5,
+  kansai:   5.7,
+  chugoku:  5.5,
+  shikoku:  1.4,      // 本四連系
+  kyushu:   2.8,      // 関門連系
+  okinawa:  0,        // 独立系統
+};
+
+/* ============ DISPATCH (national or per region) ============ */
+/* Logic: provisionally take must-run + VRE → compute balance.
+   SURPLUS branch (supply>demand): charge pumped → export via IC → curtail VRE.
+   DEFICIT branch (supply<demand): coal→LNG→oil → discharge pumped → import via IC.
+   pumped[i] is negative when charging, positive when discharging.
+   interconnect[i] is positive when importing, negative when exporting. */
+function dispatch(regionKey){
+  const isNat = (regionKey === 'national');
+  const r = isNat
+    ? {dem:1, nuclear:1, geothermal:1, hydro:1, biomass:1, solar:1, wind:1, coal:1, lng:1, oil:1, pumped:1}
+    : REGION_MIX[regionKey];
+  const icap = ICAP[regionKey] || 0;
+
+  const demand = BASE.demand.map(v => v * r.dem);
+  const solarA = BASE.solar.map(v => v * r.solar);
+  const windA  = BASE.wind.map(v => v * r.wind);
+
+  const out = {};
+  CARRIERS.forEach(c => out[c.k] = new Array(288).fill(0));
+  out.interconnect = new Array(288).fill(0);
+
+  const nuc       = CARRIERS.find(c=>c.k==='nuclear').cap    * 0.83 * r.nuclear;
+  const geo       = CARRIERS.find(c=>c.k==='geothermal').cap * 0.85 * r.geothermal;
+  const hydroBase = CARRIERS.find(c=>c.k==='hydro').cap      * 0.35 * r.hydro;
+  const bioBase   = CARRIERS.find(c=>c.k==='biomass').cap    * 0.55 * r.biomass;
+  const pumpCap   = CARRIERS.find(c=>c.k==='pumped').cap     * 0.45 * r.pumped; // dispatchable both ways
+
+  const curtail = new Array(288).fill(0);
+  const co2     = new Array(288).fill(0);
+
+  for(let i=0;i<288;i++){
+    // 1) Must-run set
+    out.nuclear[i]    = nuc;
+    out.geothermal[i] = geo;
+    out.hydro[i]      = Math.max(0, hydroBase + Math.sin((i/288)*Math.PI*2) * 1.5 * r.hydro);
+    out.biomass[i]    = bioBase;
+
+    // 2) Provisionally take all VRE
+    out.solar[i] = solarA[i];
+    out.wind[i]  = windA[i];
+
+    const mustRun = out.nuclear[i] + out.geothermal[i] + out.hydro[i] + out.biomass[i];
+    let supply   = mustRun + out.solar[i] + out.wind[i];
+    let balance  = supply - demand[i];
+
+    if(balance >= 0){
+      // ───── 余剰 (供給>需要): 揚水充電 → 連系送出 → VRE抑制 ─────
+      const hh = i/12;
+      // 充電は昼間 (10-15時) に集中。bell-shape weight
+      const chargeW = Math.max(0, 1 - Math.abs(hh - 12.5)/3.5);
+      // 3a-i) 揚水充電 (負)
+      const charge = Math.min(pumpCap * chargeW, balance);
+      if(charge > 0){
+        out.pumped[i] = -charge;
+        balance -= charge;
+      }
+      // 3a-ii) 連系線送出 (負)
+      if(balance > 0 && icap > 0){
+        const exp = Math.min(icap, balance);
+        out.interconnect[i] = -exp;
+        balance -= exp;
+      }
+      // 3a-iii) VRE出力抑制 (太陽光+風力を pro-rata で削減)
+      if(balance > 0){
+        const availVRE = out.solar[i] + out.wind[i];
+        if(availVRE > 0){
+          const reduce = Math.min(availVRE, balance);
+          const ratio  = (availVRE - reduce) / availVRE;
+          out.solar[i] = solarA[i] * ratio;
+          out.wind[i]  = windA[i]  * ratio;
+          curtail[i]   = reduce;
+          balance     -= reduce;
+        }
+      }
+      out.coal[i] = 0; out.lng[i] = 0; out.oil[i] = 0;
+    } else {
+      // ───── 不足 (需要>供給): 石炭→LNG→石油 → 揚水放電 → 連系線流入 ─────
+      let residual = -balance;
+      const coalCap = CARRIERS.find(c=>c.k==='coal').cap * 0.55 * r.coal;
+      const coal    = Math.min(coalCap, residual * 0.40);
+      out.coal[i]   = coal; residual -= coal;
+      const lngCap  = CARRIERS.find(c=>c.k==='lng').cap * 0.60 * r.lng;
+      const lng     = Math.min(lngCap, residual * 0.92);
+      out.lng[i]    = lng; residual -= lng;
+      const oilCap  = CARRIERS.find(c=>c.k==='oil').cap * 0.25 * r.oil;
+      const oil     = Math.min(oilCap, residual * 0.70);
+      out.oil[i]    = oil; residual -= oil;
+      // 揚水放電: 朝(7-10時)+夕(17-22時)を中心に bell-shape weight (滑らかに連続)
+      const hh = i/12;
+      const morningW = Math.max(0, 1 - Math.abs(hh - 8.5)/2.5);
+      const eveningW = Math.max(0, 1 - Math.abs(hh - 19.5)/3.0);
+      const dischW   = Math.min(1, morningW + eveningW);
+      if(residual > 0 && dischW > 0){
+        const dis = Math.min(pumpCap * dischW, residual);
+        out.pumped[i] = dis;
+        residual -= dis;
+      }
+      // 連系線流入
+      if(residual > 0 && icap > 0){
+        const imp = Math.min(icap, residual);
+        out.interconnect[i] = imp;
+        residual -= imp;
+      }
+      // それでも残れば石油オーバーシュート (緊急, LOLE非モデル)
+      if(residual > 0){ out.oil[i] += residual; }
+    }
+
+    // CO2 weighted intensity (positive generation only; exclude interconnect)
+    let co2num = 0, totGen = 0;
+    CARRIERS.forEach(c=>{
+      const g = out[c.k][i];
+      if(g > 0){ co2num += g * c.ci; totGen += g; }
+    });
+    co2[i] = totGen>0 ? co2num/totGen : 0;
+  }
+
+  return {carriers:out, demand, solar:solarA, wind:windA, curtail, co2, icap,
+          installedCap: CARRIERS.reduce((s,c)=>s + c.cap*r[c.k], 0)};
+}
+
+/* ============ HOVER TOOLTIP UTILITY ============ */
+const tooltipEl = () => document.getElementById('tooltip');
+
+function attachHover(svgEl, opts){
+  svgEl.classList.add('svg-hover');
+  svgEl.onmousemove = e => {
+    const tt = tooltipEl();
+    const rect = svgEl.getBoundingClientRect();
+    const xPx = e.clientX - rect.left;
+    const vb  = svgEl.viewBox.baseVal;
+    const svgX = xPx / rect.width * vb.width;
+    const slot = opts.slotFromX(svgX);
+    if(slot < 0){ tt.classList.remove('show'); return; }
+    const html = opts.contentFn(slot, svgX);
+    if(!html){ tt.classList.remove('show'); return; }
+    tt.innerHTML = html;
+    tt.classList.add('show');
+    const tw = tt.offsetWidth, th = tt.offsetHeight;
+    let tx = e.clientX + 16, ty = e.clientY + 16;
+    if(tx + tw > window.innerWidth - 12) tx = e.clientX - tw - 16;
+    if(ty + th > window.innerHeight - 12) ty = e.clientY - th - 16;
+    tt.style.left = tx + 'px';
+    tt.style.top  = ty + 'px';
+  };
+  svgEl.onmouseleave = () => tooltipEl().classList.remove('show');
+}
+
+function fmtNum(v, d=2){ return (v>=0?' ':'') + v.toFixed(d); }
+
+function buildDispatchTooltip(D, slot){
+  const dem = D.demand[slot];
+  let totGen = 0, vre = 0, fossil = 0, mustRun = 0, co2num = 0;
+  CARRIERS.forEach(c=>{
+    const v = D.carriers[c.k][slot];
+    if(v > 0){
+      totGen += v; co2num += v*c.ci;
+      if(c.k==='solar'||c.k==='wind') vre += v;
+      if(c.k==='coal'||c.k==='lng'||c.k==='oil') fossil += v;
+      if(c.k==='nuclear'||c.k==='geothermal'||c.k==='hydro'||c.k==='biomass') mustRun += v;
+    }
+  });
+  const ic = (D.carriers.interconnect||[])[slot] || 0;
+  const curt = D.curtail[slot] || 0;
+  const co2 = totGen>0 ? co2num/totGen : 0;
+  const reserveMargin = totGen>0 ? (totGen-dem)/totGen*100 : 0;
+
+  let h = `<h5>${dateLabel()}  ${slotLabel(slot)}　${REGION_LABELS[STATE.region]}</h5><table>`;
+  h += `<tr><td><span class="sw" style="background:${INK}"></span>合計需要</td><td class="r"><b>${dem.toFixed(2)} GW</b></td></tr>`;
+  h += `<tr><td class="sep"></td></tr>`;
+  CARRIERS.forEach(c=>{
+    const v = D.carriers[c.k][slot];
+    if(Math.abs(v) < 0.01) return;
+    const pct = dem>0 ? v/dem*100 : 0;
+    let tag = '';
+    if(c.k==='pumped'){
+      tag = v < -0.01 ? ' <span class="neg">充電</span>' : v > 0.01 ? ' <span class="pos">放電</span>' : '';
+    }
+    h += `<tr><td><span class="sw" style="background:${c.color}"></span>${c.nm}${tag}</td><td class="r">${fmtNum(v)} GW　${fmtNum(pct,1)}%</td></tr>`;
+  });
+  if(Math.abs(ic) > 0.01){
+    const tag = ic > 0 ? ' <span class="pos">流入</span>' : ' <span class="neg">流出</span>';
+    const pct = dem>0 ? ic/dem*100 : 0;
+    h += `<tr><td><span class="sw" style="background:#9aa8b4;border:1px solid #5a6878"></span>連系${tag}</td><td class="r">${fmtNum(ic)} GW　${fmtNum(pct,1)}%</td></tr>`;
+  }
+  if(curt > 0.01){
+    h += `<tr><td class="sep"></td></tr>`;
+    h += `<tr><td><span class="sw" style="background:repeating-linear-gradient(-45deg,#FFE9E0 0,#FFE9E0 2px,#C84B31 2px,#C84B31 3px)"></span>出力抑制</td><td class="r"><b>${curt.toFixed(2)} GW</b></td></tr>`;
+  }
+  h += `<tr><td class="sep"></td></tr>`;
+  h += `<tr><td>残余需要</td><td class="r">${(dem-vre).toFixed(2)} GW</td></tr>`;
+  h += `<tr><td>再エネ比率</td><td class="r">${(dem>0?vre/dem*100:0).toFixed(1)}%</td></tr>`;
+  h += `<tr><td>予備率</td><td class="r">${reserveMargin.toFixed(1)}%</td></tr>`;
+  h += `<tr><td>CO&#8322;原単位</td><td class="r">${co2.toFixed(0)} g/kWh</td></tr>`;
+  h += `</table>`;
+  return h;
+}
+
+function buildResidualTooltip(D, slot){
+  const dem = D.demand[slot];
+  const sol = D.carriers.solar[slot];
+  const wnd = D.carriers.wind[slot];
+  const vre = sol + wnd;
+  const res = dem - vre;
+  const curt = D.curtail[slot] || 0;
+  let h = `<h5>${dateLabel()}  ${slotLabel(slot)}　${REGION_LABELS[STATE.region]}</h5><table>`;
+  h += `<tr><td><span class="sw" style="background:${INK}"></span>需要</td><td class="r"><b>${dem.toFixed(2)} GW</b></td></tr>`;
+  h += `<tr><td><span class="sw" style="background:#f9d002"></span>太陽光</td><td class="r">${sol.toFixed(2)} GW</td></tr>`;
+  h += `<tr><td><span class="sw" style="background:#235ebc"></span>風力</td><td class="r">${wnd.toFixed(2)} GW</td></tr>`;
+  h += `<tr><td>　再エネ計</td><td class="r">${vre.toFixed(2)} GW　${(dem>0?vre/dem*100:0).toFixed(1)}%</td></tr>`;
+  h += `<tr><td class="sep"></td></tr>`;
+  h += `<tr><td>残余需要</td><td class="r"><b style="color:#9be2c2">${res.toFixed(2)} GW</b></td></tr>`;
+  if(curt > 0.01){
+    h += `<tr><td><span class="sw" style="background:repeating-linear-gradient(-45deg,#FFE9E0 0,#FFE9E0 2px,#C84B31 2px,#C84B31 3px)"></span>出力抑制</td><td class="r">${curt.toFixed(2)} GW</td></tr>`;
+  }
+  h += `</table>`;
+  return h;
+}
+
+function buildLDCTooltip(rankIdx, sortedDem, sortedRes, N){
+  const pct = (rankIdx/(N-1))*100;
+  let h = `<h5>負荷持続曲線</h5><table>`;
+  h += `<tr><td>降順順位</td><td class="r">${rankIdx+1} / ${N}</td></tr>`;
+  h += `<tr><td>上位</td><td class="r">${pct.toFixed(1)}%</td></tr>`;
+  h += `<tr><td class="sep"></td></tr>`;
+  h += `<tr><td><span class="sw" style="background:${INK}"></span>需要</td><td class="r"><b>${sortedDem[rankIdx].toFixed(2)} GW</b></td></tr>`;
+  h += `<tr><td><span class="sw" style="background:${BLUE}"></span>残余需要</td><td class="r">${sortedRes[rankIdx].toFixed(2)} GW</td></tr>`;
+  h += `</table>`;
+  return h;
+}
+
+function buildCO2Tooltip(D, slot, N){
+  const co2Slice = D.co2.slice(0,N);
+  const avg = N>0 ? co2Slice.reduce((s,v)=>s+v,0)/N : 0;
+  let h = `<h5>${dateLabel()}  ${slotLabel(slot)}</h5><table>`;
+  h += `<tr><td>CO&#8322;排出原単位</td><td class="r"><b>${D.co2[slot].toFixed(0)} g/kWh</b></td></tr>`;
+  h += `<tr><td>本日累積平均</td><td class="r">${avg.toFixed(0)} g/kWh</td></tr>`;
+  h += `</table>`;
+  return h;
+}
+
+/* ============ STATE ============ */
+const STATE = { region:'national', D:null, BASE:null, nowSlot:0, unit:'gw', regionViews:{}, xRange:[0,24], yFit:'auto', rangeMode:'0,24' };
+let BASE = null;
+
+/* return [startHour, endHour] resolved from current rangeMode */
+function resolveRange(){
+  if(STATE.rangeMode === 'elapsed'){
+    const nowH = (STATE.nowSlot+1)/12;
+    return [0, Math.max(1, nowH)];
+  }
+  if(STATE.rangeMode === 'now'){
+    const nowH = STATE.nowSlot/12;
+    let s = Math.max(0, nowH - 2);
+    let e = Math.min(24, nowH + 2);
+    if(e - s < 4){
+      if(s === 0) e = 4;
+      else s = 20;
+    }
+    return [s,e];
+  }
+  const [s,e] = STATE.rangeMode.split(',').map(Number);
+  return [s,e];
+}
+
+function rebuildView(){
+  STATE.D = dispatch(STATE.region);
+  // also rebuild all-region matrix data
+  STATE.regionViews = {};
+  REGIONS.forEach(r => STATE.regionViews[r.key] = dispatch(r.key));
+}
+
+/* ============ MASTHEAD + CONTROL BAR ============ */
+function tick(){
+  const d = new Date();
+  document.getElementById('m-date').textContent = dateLabel();
+  document.getElementById('m-time').textContent =
+    String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');
+  const ns = nowSlotIdx();
+  if(ns !== STATE.nowSlot){
+    STATE.nowSlot = ns;
+    renderAll();
+  } else {
+    updateControlBar();
+  }
+}
+
+function updateControlBar(){
+  document.getElementById('cb-now').innerHTML =
+    `現在 <b>${dateLabel()} ${slotLabel(STATE.nowSlot)} JST</b>`;
+  document.getElementById('cb-cap').innerHTML =
+    `設備容量 <b>${STATE.D.installedCap.toFixed(1)} GW</b>`;
+  const [s,e] = resolveRange();
+  const fmt = h => `${String(Math.floor(h)).padStart(2,'0')}:${String(Math.round((h-Math.floor(h))*60)).padStart(2,'0')}`;
+  document.getElementById('cb-range').innerHTML =
+    `範囲 ${fmt(s)} &ndash; ${fmt(e)}　縦軸 <b>${STATE.yFit==='auto'?'自動':'固定'}</b>`;
+}
+
+/* ============ SPARKLINES ============ */
+function drawSpark(svg, partial, full){
+  const W=200,H=22;
+  const min = Math.min(...full), max=Math.max(...full);
+  const span = max-min || 1;
+  const ptsP = partial.map((v,i)=>`${(i/(full.length-1))*W},${H - (v-min)/span*H}`).join(' ');
+  const pts  = full.map((v,i)=>`${(i/(full.length-1))*W},${H - (v-min)/span*H}`).join(' ');
+  svg.innerHTML = `
+    <polyline points="${pts}" fill="none" stroke="${NAVY}" stroke-width=".5" opacity=".18"/>
+    <polyline points="${ptsP}" fill="none" stroke="${CYAN}" stroke-width="1.2"/>
+    <circle cx="${(partial.length-1)/(full.length-1)*W}" cy="${H - (partial[partial.length-1]-min)/span*H}" r="1.6" fill="${BLUE}"/>`;
+}
+
+/* ============ EX1 KPI ============ */
+function renderKPI(){
+  const D = STATE.D, i = STATE.nowSlot;
+  const dem = D.demand[i];
+  const vre = D.carriers.solar[i] + D.carriers.wind[i];
+  const vreShare = dem>0 ? vre/dem*100 : 0;
+  const residual = dem - vre;
+  const pumpedNow = D.carriers.pumped[i];
+  // 予備率 = (供給力 − 需要) / 需要 × 100  (各送配電事業者でんき予報の公開式)
+  const totalSupply = CARRIERS.reduce((s,c)=>s+Math.max(0,D.carriers[c.k][i]),0);
+  const resMargin = dem>0 ? ((totalSupply-dem)/dem)*100 : 0;
+
+  const kpis = [
+    {lab:'系統需要',         val:dem.toFixed(1),                 u:'GW',    spark:D.demand.slice(0,i+1)},
+    {lab:'再エネ比率',       val:vreShare.toFixed(1),            u:'%',     spark:D.demand.slice(0,i+1).map((v,k)=>v>0?(D.carriers.solar[k]+D.carriers.wind[k])/v*100:0)},
+    {lab:'残余需要',         val:residual.toFixed(1),            u:'GW',    spark:D.demand.slice(0,i+1).map((v,k)=>v-D.carriers.solar[k]-D.carriers.wind[k])},
+    {lab:'排出原単位',       val:D.co2[i].toFixed(0),            u:'g/kWh', spark:D.co2.slice(0,i+1)},
+    {lab:'予備率',           val:resMargin.toFixed(1),           u:'%',     spark:D.demand.slice(0,i+1).map((v,k)=>{const tot=CARRIERS.reduce((s,c)=>s+Math.max(0,D.carriers[c.k][k]),0);return v>0?(tot-v)/v*100:0})},
+    {lab:'揚水',             val:pumpedNow.toFixed(1),           u:'GW',    spark:D.carriers.pumped.slice(0,i+1)},
+  ];
+
+  const row = document.getElementById('kpi-row');
+  row.innerHTML = kpis.map(k=>`
+    <div class="kpi">
+      <div class="kpi-lab">${k.lab}</div>
+      <div class="kpi-val">${k.val}<span class="u">${k.u}</span></div>
+      <svg class="kpi-spark" viewBox="0 0 200 22" preserveAspectRatio="none"></svg>
+    </div>`).join('');
+  const sparks = row.querySelectorAll('.kpi-spark');
+  kpis.forEach((k,j)=>{
+    if(k.spark.length>1) drawSpark(sparks[j], k.spark, k.spark);
+  });
+}
+
+/* ============ EX2 DISPATCH STACK (realised only) ============ */
+function renderDispatch(){
+  const svg = document.getElementById('disp-svg');
+  const W=980,H=440, PL=44,PR=12,PT=14,PB=28;
+  const iw=W-PL-PR, ih=H-PT-PB;
+  const D = STATE.D;
+  const i = STATE.nowSlot;
+  const unit = STATE.unit;
+  const N = i+1; // slots realised
+
+  const [startHour, endHour] = resolveRange();
+  const startSlot = Math.max(0, Math.floor(startHour*12));
+  const endSlot   = Math.min(288, Math.ceil(endHour*12));
+  const visSlots  = Math.max(1, endSlot - startSlot);
+
+  // Order: bottom→top of POSITIVE stack. Pumped & interconnect at top (both can swing +/-).
+  const order = ['nuclear','geothermal','hydro','biomass','solar','wind','coal','lng','oil','pumped','interconnect'];
+  const META  = {
+    nuclear:{color:'#ff8c00',nm:'原子力'},
+    geothermal:{color:'#ba91b1',nm:'地熱'},
+    hydro:{color:'#298c81',nm:'水力'},
+    biomass:{color:'#baa741',nm:'バイオマス'},
+    solar:{color:'#f9d002',nm:'太陽光'},
+    wind:{color:'#235ebc',nm:'風力'},
+    coal:{color:'#545454',nm:'石炭'},
+    lng:{color:'#a85522',nm:'LNG'},
+    oil:{color:'#262626',nm:'石油'},
+    pumped:{color:'#51dbcc',nm:'揚水'},
+    interconnect:{color:'#9aa8b4',nm:'地域間連系'},
+  };
+
+  // Pre-compute pos/neg totals per slot for y-axis sizing
+  // 出力抑制は負側スタック (揚水充電の直下) に置く
+  const posTotal = new Array(N).fill(0);
+  const negTotal = new Array(N).fill(0);
+  for(let k=0;k<N;k++){
+    order.forEach(key=>{
+      const v = (D.carriers[key]||[])[k] || 0;
+      if(v>0) posTotal[k] += v;
+      else if(v<0) negTotal[k] += v;
+    });
+  }
+  const curtSliceFull = (D.curtail||[]).slice(0,N);
+  // 出力抑制 を負側に加算
+  for(let k=0;k<N;k++) negTotal[k] -= (curtSliceFull[k]||0);
+
+  // y-axis range
+  let yMax, yMin;
+  if(unit==='share'){
+    let maxSh = 100, minSh = 0;
+    for(let k=0;k<N;k++){
+      if(D.demand[k]>0){
+        const posPct = posTotal[k]/D.demand[k]*100;
+        if(posPct > maxSh) maxSh = posPct;
+        const negPct = negTotal[k]/D.demand[k]*100;
+        if(negPct < minSh) minSh = negPct;
+      }
+    }
+    yMax = Math.ceil(maxSh/20)*20;
+    yMin = Math.floor(minSh/10)*10;
+  } else {
+    let rawMax = 0, rawMin = 0;
+    const inRange = (k)=> STATE.yFit==='auto' ? (k>=startSlot && k<endSlot) : true;
+    for(let k=0;k<N;k++){
+      if(!inRange(k)) continue;
+      if(posTotal[k] > rawMax) rawMax = posTotal[k];
+      if(D.demand[k] > rawMax) rawMax = D.demand[k];
+      if(negTotal[k] < rawMin) rawMin = negTotal[k];
+    }
+    if(rawMax===0) rawMax = STATE.D.installedCap*0.5;
+    yMax = Math.ceil(rawMax*1.05/5)*5 || 5;
+    yMin = Math.floor(rawMin*1.10/5)*5;
+  }
+  if(yMax-yMin < 1) yMax = yMin + 1;
+
+  const x = (idx)=> PL + ((idx - startSlot)/visSlots)*iw;
+  const y = (v)=> PT + ih - ((v-yMin)/(yMax-yMin))*ih;
+
+  // ─── SVG defs: hatch pattern for curtailment ───
+  let g = `<defs>
+    <pattern id="hatchCurt" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(-45)">
+      <rect width="7" height="7" fill="#FFE9E0"/>
+      <line x1="0" y1="0" x2="0" y2="7" stroke="#C84B31" stroke-width="1.8"/>
+    </pattern>
+    <pattern id="hatchIC" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+      <rect width="6" height="6" fill="#9aa8b4" opacity="0.30"/>
+      <line x1="0" y1="0" x2="0" y2="6" stroke="#5a6878" stroke-width="0.9"/>
+    </pattern>
+    <clipPath id="dispClip"><rect x="${PL}" y="${PT}" width="${iw}" height="${ih}"/></clipPath>
+  </defs>`;
+
+  // gridlines
+  const steps = 8;
+  for(let s=0;s<=steps;s++){
+    const v = yMin + (yMax-yMin)*s/steps;
+    const yy = y(v);
+    g += `<line x1="${PL}" y1="${yy}" x2="${W-PR}" y2="${yy}" stroke="rgba(5,28,42,.08)" stroke-width=".5"/>`;
+    g += `<text x="${PL-6}" y="${yy+3}" font-family="IBM Plex Mono" font-size="9" fill="rgba(5,28,42,.5)" text-anchor="end">${v.toFixed(unit==='share'?0:1)}${unit==='share'?'%':''}</text>`;
+  }
+  if(yMin < 0){
+    const yz = y(0);
+    g += `<line x1="${PL}" y1="${yz}" x2="${W-PR}" y2="${yz}" stroke="rgba(5,28,42,.55)" stroke-width=".9"/>`;
+    g += `<text x="${PL+4}" y="${yz-3}" font-family="IBM Plex Mono" font-size="9" fill="rgba(5,28,42,.5)">0</text>`;
+  }
+  // X ticks
+  const span = endHour - startHour;
+  const tickStep = span<=4 ? 0.5 : span<=8 ? 1 : 2;
+  for(let h=Math.ceil(startHour/tickStep)*tickStep; h<=endHour+0.001; h+=tickStep){
+    const xx = x(h*12);
+    if(xx < PL-1 || xx > W-PR+1) continue;
+    g += `<line x1="${xx}" y1="${PT+ih}" x2="${xx}" y2="${PT+ih+4}" stroke="rgba(5,28,42,.3)" stroke-width=".5"/>`;
+    const lblTxt = Number.isInteger(h) ? String(h).padStart(2,'0') : `${String(Math.floor(h)).padStart(2,'0')}:${String(Math.round((h-Math.floor(h))*60)).padStart(2,'0')}`;
+    g += `<text x="${xx}" y="${PT+ih+16}" font-family="IBM Plex Mono" font-size="9" fill="rgba(5,28,42,.55)" text-anchor="middle">${lblTxt}</text>`;
+  }
+  // future-zone shade
+  if(i < endSlot && i >= startSlot){
+    const nx = x(i);
+    g += `<rect x="${nx}" y="${PT}" width="${(W-PR) - nx}" height="${ih}" fill="rgba(5,28,42,.04)"/>`;
+  }
+
+  // ─── Build stack series. STRICT separation: positive only above 0, negative only below 0. ───
+  const posStacks = new Array(N).fill(0);
+  const negStacks = new Array(N).fill(0); // values are 0 or negative
+
+  // helper: convert raw GW to either GW or share-of-demand
+  const conv = (raw, k) => unit==='share'
+    ? (D.demand[k]>0 ? raw/D.demand[k]*100 : 0)
+    : raw;
+
+  // body of the clipped chart region
+  let body = '';
+
+  // Build segmented area path: separate sub-path for each contiguous run of non-zero values.
+  // sign = +1: include only vals[k] > 0; sign = -1: include only vals[k] < 0
+  function buildSegmented(N, vals, baseStacks, sign){
+    let path = '';
+    let runStart = -1;
+    for(let k=0; k<=N; k++){
+      const v = k < N ? vals[k] : 0;
+      const inRun = sign>0 ? v > 0 : v < 0;
+      if(inRun && runStart === -1){
+        runStart = k;
+        path += `M${x(k)},${y(baseStacks[k] + v)}`;
+      } else if(inRun){
+        path += ` L${x(k)},${y(baseStacks[k] + v)}`;
+      } else if(!inRun && runStart !== -1){
+        for(let j=k-1; j>=runStart; j--){
+          path += ` L${x(j)},${y(baseStacks[j])}`;
+        }
+        path += ' Z';
+        runStart = -1;
+      }
+    }
+    return path;
+  }
+
+  order.forEach(key=>{
+    const series = D.carriers[key] || new Array(N).fill(0);
+    const m = META[key];
+
+    const posVals = new Array(N).fill(0);
+    const negVals = new Array(N).fill(0);
+    let anyPos = false, anyNeg = false;
+    for(let k=0;k<N;k++){
+      const raw = series[k];
+      if(raw > 0){ posVals[k] = conv(raw, k); anyPos = true; }
+      else if(raw < 0){ negVals[k] = conv(raw, k); anyNeg = true; }
+    }
+
+    const stroke = key==='interconnect' ? '#5a6878' : '#FFF';
+    const sw     = key==='interconnect' ? '.5'      : '.3';
+
+    if(anyPos){
+      const p = buildSegmented(N, posVals, posStacks, +1);
+      if(p) body += `<path d="${p}" fill="${m.color}" opacity="0.92" stroke="${stroke}" stroke-width="${sw}"/>`;
+      for(let k=0;k<N;k++) posStacks[k] += posVals[k];
+    }
+    if(anyNeg){
+      const p = buildSegmented(N, negVals, negStacks, -1);
+      if(p) body += `<path d="${p}" fill="${m.color}" opacity="0.85" stroke="${stroke}" stroke-width="${sw}"/>`;
+      for(let k=0;k<N;k++) negStacks[k] += negVals[k];
+    }
+
+    // 揚水充電の直下に出力抑制を負側として配置
+    if(key === 'pumped'){
+      const curtMax = Math.max(...curtSliceFull, 0);
+      if(curtMax > 0.05){
+        const curtNegVals = new Array(N).fill(0);
+        for(let k=0;k<N;k++){
+          const cv = curtSliceFull[k] || 0;
+          if(cv > 0.001) curtNegVals[k] = -conv(cv, k);
+        }
+        const p = buildSegmented(N, curtNegVals, negStacks, -1);
+        if(p) body += `<path d="${p}" fill="url(#hatchCurt)" opacity="0.85" stroke="#C84B31" stroke-width=".5"/>`;
+        for(let k=0;k<N;k++) negStacks[k] += curtNegVals[k];
+      }
+    }
+  });
+  const curtMax = Math.max(...curtSliceFull, 0);
+
+  // ─── Demand line ───
+  if(unit==='gw'){
+    let dp = '', started=false;
+    for(let k=0;k<N;k++){
+      const xx = x(k), yy = y(D.demand[k]);
+      if(!started){ dp += `M${xx},${yy}`; started=true; }
+      else dp += ` L${xx},${yy}`;
+    }
+    body += `<path d="${dp}" fill="none" stroke="${INK}" stroke-width="1.5" opacity="0.90"/>`;
+    if(i>=startSlot && i<endSlot)
+      body += `<circle cx="${x(i)}" cy="${y(D.demand[i])}" r="3.2" fill="${INK}"/>`;
+  }
+
+  g += `<g clip-path="url(#dispClip)">${body}</g>`;
+
+  // ─── Annotations (outside clip) ───
+  if(curtMax > 0.05){
+    g += `<rect x="${PL+6}" y="${PT+ih-14}" width="13" height="10" fill="url(#hatchCurt)" stroke="#C84B31" stroke-width=".5"/>`;
+    g += `<text x="${PL+24}" y="${PT+ih-5}" font-family="IBM Plex Mono" font-size="9.5" fill="#C84B31">出力抑制 最大 ${curtMax.toFixed(2)} GW</text>`;
+  }
+  if(yMin < 0){
+    g += `<text x="${W-PR-4}" y="${y(yMin*0.55)}" font-family="IBM Plex Mono" font-size="9" fill="rgba(5,28,42,.55)" text-anchor="end">▼ 揚水充電・出力抑制・連系送出</text>`;
+  }
+
+  // ─── NOW marker ───
+  if(i>=startSlot && i<=endSlot){
+    const nx = x(i);
+    const lbl = `現在　${dateLabel()} ${slotLabel(i)}`;
+    const lblW = lbl.length * 6.4 + 14;
+    const lblX = Math.max(PL+lblW/2, Math.min(W-PR-lblW/2, nx));
+    g += `<line x1="${nx}" y1="${PT}" x2="${nx}" y2="${PT+ih}" stroke="${CYAN}" stroke-width="1.2" stroke-dasharray="4,3"/>`;
+    g += `<rect x="${lblX-lblW/2}" y="${PT-2}" width="${lblW}" height="14" fill="${CYAN}"/>`;
+    g += `<text x="${lblX}" y="${PT+8}" font-family="IBM Plex Sans" font-size="9.5" fill="#FFF" text-anchor="middle" font-weight="500">${lbl}</text>`;
+  }
+
+  // Y axis label
+  g += `<text x="14" y="${PT+ih/2}" font-family="IBM Plex Mono" font-size="9" fill="rgba(5,28,42,.55)" text-anchor="middle" transform="rotate(-90 14 ${PT+ih/2})">${unit==='share'?'比率 %':'GW'}</text>`;
+
+  svg.innerHTML = g;
+  renderCarrierLegend();
+
+  // Hover
+  attachHover(svg, {
+    slotFromX: (svgX) => {
+      const PL = 44, PR = 12, iw = 980 - PL - PR;
+      if(svgX < PL || svgX > 980 - PR) return -1;
+      const [sH,eH] = resolveRange();
+      const sS = Math.max(0,Math.floor(sH*12));
+      const eS = Math.min(288,Math.ceil(eH*12));
+      const visS = Math.max(1, eS-sS);
+      const slot = Math.floor(sS + (svgX - PL)/iw * visS);
+      return Math.max(0, Math.min(STATE.nowSlot, slot));
+    },
+    contentFn: (slot) => buildDispatchTooltip(STATE.D, slot)
+  });
+}
+
+function renderCarrierLegend(){
+  const D = STATE.D, i = STATE.nowSlot;
+  const groups = {};
+  CARRIERS.forEach(c=>{ if(!groups[c.grp]) groups[c.grp]=[]; groups[c.grp].push(c); });
+  let html = '';
+  for(const grp of Object.keys(groups)){
+    html += `<div class="carrier-group">${grp}</div>`;
+    for(const c of groups[grp]){
+      const v = D.carriers[c.k][i];
+      const pct = D.demand[i]>0 ? v/D.demand[i]*100 : 0;
+      const isCharging = c.k==='pumped' && v<0;
+      html += `<div class="carrier-row">
+        <div class="sw" style="background:${c.color}"></div>
+        <div class="nm">${c.nm}${isCharging?' <span style="color:#C84B31">↓充電</span>':''}</div>
+        <div class="gw">${v.toFixed(2)}</div>
+        <div class="pc">${pct.toFixed(1)}%</div>
+      </div>`;
+    }
+  }
+  const icv = D.carriers.interconnect ? D.carriers.interconnect[i] : 0;
+  if(D.icap > 0 || icv !== 0){
+    html += `<div class="carrier-group">連系</div>`;
+    const ipct = D.demand[i]>0 ? icv/D.demand[i]*100 : 0;
+    const tag = icv > 0.05 ? ' <span style="color:#2E8B57">↑流入</span>' : icv < -0.05 ? ' <span style="color:#C84B31">↓流出</span>' : '';
+    html += `<div class="carrier-row">
+      <div class="sw" style="background:#9aa8b4;border:1px solid #5a6878"></div>
+      <div class="nm">連系${tag}</div>
+      <div class="gw">${icv.toFixed(2)}</div>
+      <div class="pc">${ipct.toFixed(1)}%</div>
+    </div>`;
+    html += `<div style="font-family:var(--mono);font-size:9px;color:var(--muted);padding:3px 0 0">連系容量 ±${D.icap.toFixed(1)} GW</div>`;
+  }
+  const cv = D.curtail[i] || 0;
+  if(cv > 0.05){
+    html += `<div class="carrier-group">系統制約</div>`;
+    html += `<div class="carrier-row">
+      <div class="sw" style="background:repeating-linear-gradient(-45deg,#FFE9E0 0,#FFE9E0 2px,#C84B31 2px,#C84B31 3px);border:1px solid #C84B31"></div>
+      <div class="nm">出力抑制</div>
+      <div class="gw">${cv.toFixed(2)}</div>
+      <div class="pc">${(D.demand[i]>0?cv/D.demand[i]*100:0).toFixed(1)}%</div>
+    </div>`;
+  }
+  html += `<div class="carrier-group">需要</div>`;
+  html += `<div class="carrier-row">
+    <div class="sw" style="background:${INK};height:2px;margin-top:4px"></div>
+    <div class="nm">合計</div>
+    <div class="gw">${D.demand[i].toFixed(2)}</div>
+    <div class="pc">100%</div>
+  </div>`;
+  document.getElementById('carrier-legend').innerHTML = html;
+}
+
+/* ============ EX3a RESIDUAL ============ */
+function renderResidual(){
+  const svg = document.getElementById('resid-svg');
+  const W=700,H=280, PL=44,PR=8,PT=10,PB=24;
+  const iw=W-PL-PR, ih=H-PT-PB;
+  const D = STATE.D;
+  const i = STATE.nowSlot;
+  const N = i+1;
+
+  const [startHour, endHour] = resolveRange();
+  const startSlot = Math.max(0, Math.floor(startHour*12));
+  const endSlot   = Math.min(288, Math.ceil(endHour*12));
+  const visSlots  = Math.max(1, endSlot - startSlot);
+
+  const vre = [];
+  const residual = [];
+  for(let k=0;k<N;k++){
+    vre.push(D.carriers.solar[k]+D.carriers.wind[k]);
+    residual.push(D.demand[k] - vre[k]);
+  }
+
+  let yMax, yMin;
+  if(STATE.yFit==='auto'){
+    const visStart = Math.max(0, startSlot), visEnd = Math.min(N, endSlot);
+    let lo=0, hi=0.1;
+    for(let k=visStart;k<visEnd;k++){
+      if(D.demand[k]>hi) hi = D.demand[k];
+      if(residual[k]<lo) lo = residual[k];
+    }
+    yMax = Math.ceil(hi*1.05);
+    yMin = Math.min(0, Math.floor(lo*1.05));
+  } else {
+    yMax = Math.max(0.1, Math.ceil(Math.max(...D.demand.slice(0,N))*1.05));
+    yMin = Math.min(0, Math.min(...residual, 0));
+  }
+  if(yMax-yMin < 0.1) yMax = yMin + 0.1;
+
+  const x = (idx)=>PL + ((idx-startSlot)/visSlots)*iw;
+  const y = (v)=>PT + ih - ((v-yMin)/(yMax-yMin))*ih;
+
+  let g = '';
+  for(let s=0;s<=4;s++){
+    const v = yMin + (yMax-yMin)*s/4, yy = y(v);
+    g += `<line x1="${PL}" y1="${yy}" x2="${W-PR}" y2="${yy}" stroke="rgba(5,28,42,.08)" stroke-width=".5"/>`;
+    g += `<text x="${PL-6}" y="${yy+3}" font-family="IBM Plex Mono" font-size="9" fill="rgba(5,28,42,.5)" text-anchor="end">${v.toFixed(1)}</text>`;
+  }
+  const span = endHour - startHour;
+  const tickStep = span<=4 ? 1 : span<=12 ? 2 : 3;
+  for(let h=Math.ceil(startHour/tickStep)*tickStep; h<=endHour; h+=tickStep){
+    const xx = x(h*12);
+    if(xx < PL-1 || xx > W-PR+1) continue;
+    g += `<text x="${xx}" y="${PT+ih+14}" font-family="IBM Plex Mono" font-size="9" fill="rgba(5,28,42,.55)" text-anchor="middle">${String(h).padStart(2,'0')}</text>`;
+  }
+
+  // not-yet shade (only if visible)
+  if(i >= startSlot && i < endSlot){
+    const nx = x(i);
+    g += `<rect x="${nx}" y="${PT}" width="${(W-PR)-nx}" height="${ih}" fill="rgba(5,28,42,.04)"/>`;
+  }
+
+  // VRE area
+  if(N>1){
+    let vp = `M${x(0)},${y(0)}`;
+    for(let k=0;k<N;k++) vp += ` L${x(k)},${y(vre[k])}`;
+    for(let k=N-1;k>=0;k--) vp += ` L${x(k)},${y(0)}`;
+    vp += ' Z';
+    g += `<path d="${vp}" fill="${CYAN}" opacity="0.30"/>`;
+  }
+
+  // Curtailment red bars
+  const curtSlice = D.curtail.slice(0,N);
+  let curtMax = Math.max(...curtSlice, 0);
+  if(curtMax > 0.1){
+    for(let k=0;k<N;k++){
+      if(curtSlice[k]>0.05){
+        const xx = x(k);
+        const top = y(D.demand[k] + curtSlice[k]);
+        const bot = y(D.demand[k]);
+        g += `<line x1="${xx}" y1="${top}" x2="${xx}" y2="${bot}" stroke="#C84B31" stroke-width="1" opacity=".55"/>`;
+      }
+    }
+  }
+
+  // Demand line
+  let dp = '';
+  for(let k=0;k<N;k++) dp += (k===0?'M':' L') + x(k) + ',' + y(D.demand[k]);
+  g += `<path d="${dp}" fill="none" stroke="${INK}" stroke-width="1.5"/>`;
+
+  // Residual line
+  let rp = '';
+  for(let k=0;k<N;k++) rp += (k===0?'M':' L') + x(k) + ',' + y(residual[k]);
+  g += `<path d="${rp}" fill="none" stroke="${NAVY}" stroke-width="1.5" stroke-dasharray="3,3"/>`;
+
+  // Zero line
+  if(yMin < 0){
+    const z = y(0);
+    g += `<line x1="${PL}" y1="${z}" x2="${W-PR}" y2="${z}" stroke="#C84B31" stroke-width=".6" stroke-dasharray="2,2"/>`;
+  }
+
+  // NOW marker
+  if(i >= startSlot && i <= endSlot){
+    const nx = x(i);
+    g += `<line x1="${nx}" y1="${PT}" x2="${nx}" y2="${PT+ih}" stroke="${CYAN}" stroke-width="1" stroke-dasharray="2,2"/>`;
+    g += `<rect x="${nx-46}" y="${PT-2}" width="92" height="12" fill="${CYAN}"/>`;
+    g += `<text x="${nx}" y="${PT+7}" font-family="IBM Plex Sans" font-size="8.5" fill="#FFF" text-anchor="middle">現在 ${slotLabel(i)}</text>`;
+  }
+
+  // belly annotation (duck-curve minimum)
+  if(N > 30){
+    const visStart = Math.max(0, startSlot), visEnd = Math.min(N, endSlot);
+    let minRes = Infinity, minIdx = -1;
+    for(let k=visStart;k<visEnd;k++){
+      if(residual[k] < minRes){ minRes = residual[k]; minIdx = k; }
+    }
+    if(minIdx >= 0 && minRes < D.demand[minIdx] * 0.6){
+      g += `<circle cx="${x(minIdx)}" cy="${y(minRes)}" r="3" fill="none" stroke="${NAVY}" stroke-width="1"/>`;
+      g += `<text x="${x(minIdx)+6}" y="${y(minRes)-4}" font-family="IBM Plex Mono" font-size="9" fill="${NAVY}">谷 ${minRes.toFixed(1)} @ ${slotLabel(minIdx)}</text>`;
+    }
+  }
+
+  svg.innerHTML = g;
+
+  // Hover
+  attachHover(svg, {
+    slotFromX: (svgX) => {
+      const PL = 44, PR = 8, iw = 700 - PL - PR;
+      if(svgX < PL || svgX > 700 - PR) return -1;
+      const [sH,eH] = resolveRange();
+      const sS = Math.max(0,Math.floor(sH*12));
+      const eS = Math.min(288,Math.ceil(eH*12));
+      const visS = Math.max(1, eS-sS);
+      const slot = Math.floor(sS + (svgX - PL)/iw * visS);
+      return Math.max(0, Math.min(STATE.nowSlot, slot));
+    },
+    contentFn: (slot) => buildResidualTooltip(STATE.D, slot)
+  });
+}
+function renderLDC(){
+  const svg = document.getElementById('ldc-svg');
+  const W=700,H=280, PL=44,PR=8,PT=10,PB=24;
+  const iw=W-PL-PR, ih=H-PT-PB;
+  const D = STATE.D;
+  const N = STATE.nowSlot + 1;
+
+  if(N < 2){ svg.innerHTML = `<text x="${W/2}" y="${H/2}" font-family="IBM Plex Mono" font-size="11" fill="rgba(5,28,42,.4)" text-anchor="middle">データ蓄積中...</text>`; return; }
+
+  const dem = D.demand.slice(0,N).sort((a,b)=>b-a);
+  const res = D.demand.slice(0,N).map((v,k)=>v - D.carriers.solar[k] - D.carriers.wind[k]).sort((a,b)=>b-a);
+  const yMax = Math.max(0.1, Math.ceil(Math.max(...dem)*1.05));
+  const yMin = Math.min(0, Math.min(...res));
+
+  const x = (idx)=>PL + (idx/(N-1))*iw;
+  const y = (v)=>PT + ih - ((v-yMin)/(yMax-yMin))*ih;
+
+  let g = '';
+  for(let s=0;s<=4;s++){
+    const v = yMin + (yMax-yMin)*s/4, yy = y(v);
+    g += `<line x1="${PL}" y1="${yy}" x2="${W-PR}" y2="${yy}" stroke="rgba(5,28,42,.08)" stroke-width=".5"/>`;
+    g += `<text x="${PL-6}" y="${yy+3}" font-family="IBM Plex Mono" font-size="9" fill="rgba(5,28,42,.5)" text-anchor="end">${v.toFixed(1)}</text>`;
+  }
+  [0,25,50,75,100].forEach(p=>{
+    const xx = x(p/100*(N-1));
+    g += `<text x="${xx}" y="${PT+ih+14}" font-family="IBM Plex Mono" font-size="9" fill="rgba(5,28,42,.55)" text-anchor="middle">${p}%</text>`;
+  });
+
+  let dp = `M${x(0)},${y(yMin)}`;
+  for(let k=0;k<N;k++) dp += ` L${x(k)},${y(dem[k])}`;
+  dp += ` L${x(N-1)},${y(yMin)} Z`;
+  g += `<path d="${dp}" fill="${NAVY}" opacity=".10"/>`;
+
+  let rp = `M${x(0)},${y(yMin)}`;
+  for(let k=0;k<N;k++) rp += ` L${x(k)},${y(res[k])}`;
+  rp += ` L${x(N-1)},${y(yMin)} Z`;
+  g += `<path d="${rp}" fill="${CYAN}" opacity=".20"/>`;
+
+  let dl=''; for(let k=0;k<N;k++) dl += (k===0?'M':' L') + x(k)+','+y(dem[k]);
+  g += `<path d="${dl}" fill="none" stroke="${INK}" stroke-width="1.4"/>`;
+  let rl=''; for(let k=0;k<N;k++) rl += (k===0?'M':' L') + x(k)+','+y(res[k]);
+  g += `<path d="${rl}" fill="none" stroke="${BLUE}" stroke-width="1.4" stroke-dasharray="3,3"/>`;
+
+  if(yMin < 0){
+    const z = y(0);
+    g += `<line x1="${PL}" y1="${z}" x2="${W-PR}" y2="${z}" stroke="#C84B31" stroke-width=".6" stroke-dasharray="2,2"/>`;
+  }
+
+  g += `<text x="${x(Math.min(20,Math.floor(N*0.1)))}" y="${y(dem[Math.min(20,Math.floor(N*0.1))])-6}" font-family="IBM Plex Sans" font-size="10" fill="${INK}">需要</text>`;
+  g += `<text x="${x(Math.min(40,Math.floor(N*0.2)))}" y="${y(res[Math.min(40,Math.floor(N*0.2))])-6}" font-family="IBM Plex Sans" font-size="10" fill="${BLUE}">残余需要</text>`;
+
+  const totDemTWh = dem.reduce((s,v)=>s+v,0) * 5/60 / 1000;
+  const totResTWh = res.reduce((s,v)=>s+v,0) * 5/60 / 1000;
+  g += `<text x="${W-PR-4}" y="${PT+12}" font-family="IBM Plex Mono" font-size="9" fill="${NAVY}" text-anchor="end">&int;需要 &asymp; ${totDemTWh.toFixed(3)} TWh</text>`;
+  g += `<text x="${W-PR-4}" y="${PT+24}" font-family="IBM Plex Mono" font-size="9" fill="${BLUE}" text-anchor="end">&int;残余 &asymp; ${totResTWh.toFixed(3)} TWh</text>`;
+
+  svg.innerHTML = g;
+
+  // Hover (LDC: x-axis is descending sorted rank, not time)
+  attachHover(svg, {
+    slotFromX: (svgX) => {
+      const PL2 = 44, PR2 = 8, iw = 700 - PL2 - PR2;
+      if(svgX < PL2 || svgX > 700 - PR2 || N < 2) return -1;
+      const rank = Math.floor((svgX - PL2)/iw * (N-1));
+      return Math.max(0, Math.min(N-1, rank));
+    },
+    contentFn: (rank) => buildLDCTooltip(rank, dem, res, N)
+  });
+}
+
+/* ============ EX4 MIX + CF + CO2 ============ */
+function renderMix(){
+  const D = STATE.D;
+  const i = STATE.nowSlot;
+  const N = i+1;
+
+  const mwh = {};
+  let total = 0;
+  CARRIERS.forEach(c=>{
+    let s=0;
+    for(let k=0;k<N;k++) s += Math.max(0,D.carriers[c.k][k]);
+    s = s * (5/60) * 1000; // GW·5min → MWh
+    mwh[c.k] = s; total += s;
+  });
+
+  // Donut
+  const svg = document.getElementById('donut-svg');
+  const cx=100, cy=100, R=80, r=50;
+  let ang = -Math.PI/2;
+  let paths = '';
+  let legend = '';
+  CARRIERS.forEach(c=>{
+    if(total<=0) return;
+    const pct = mwh[c.k]/total;
+    if(pct < 0.001) return;
+    const dAng = pct * Math.PI*2;
+    const a2 = ang + dAng;
+    const large = dAng > Math.PI ? 1 : 0;
+    const x1=cx+R*Math.cos(ang),  y1=cy+R*Math.sin(ang);
+    const x2=cx+R*Math.cos(a2),   y2=cy+R*Math.sin(a2);
+    const x3=cx+r*Math.cos(a2),   y3=cy+r*Math.sin(a2);
+    const x4=cx+r*Math.cos(ang),  y4=cy+r*Math.sin(ang);
+    paths += `<path d="M${x1},${y1} A${R},${R} 0 ${large},1 ${x2},${y2} L${x3},${y3} A${r},${r} 0 ${large},0 ${x4},${y4} Z" fill="${c.color}" stroke="#fff" stroke-width="1"/>`;
+    legend += `<div style="display:grid;grid-template-columns:10px 1fr auto;gap:6px;align-items:center"><div style="background:${c.color};height:8px;width:10px"></div><span style="color:var(--navy)">${c.nm}</span><span style="color:var(--muted)">${(pct*100).toFixed(1)}%</span></div>`;
+    ang = a2;
+  });
+  svg.innerHTML = paths + `<text x="${cx}" y="${cy-4}" font-family="Newsreader" font-size="20" fill="${NAVY}" text-anchor="middle">${(total/1000).toFixed(2)}</text><text x="${cx}" y="${cy+12}" font-family="IBM Plex Mono" font-size="9" fill="rgba(5,28,42,.55)" text-anchor="middle">GWh 累積</text>`;
+  document.getElementById('donut-legend').innerHTML = legend;
+
+  // CF bars
+  const cfsvg = document.getElementById('cf-svg');
+  const W=360,H=280, PL=80,PR=12,PT=10,PB=20;
+  const iw=W-PL-PR, ih=H-PT-PB;
+  const hoursElapsed = Math.max(0.0833, N*5/60);
+  // regional installed cap = cap × region_share
+  const rmix = STATE.region==='national'
+    ? Object.fromEntries(CARRIERS.map(c=>[c.k,1]))
+    : REGION_MIX[STATE.region];
+  const cfs = CARRIERS.map(c=>{
+    const installedRegional = c.cap * rmix[c.k];
+    const cf = installedRegional>0 ? (mwh[c.k] / (installedRegional*1000*hoursElapsed)) : 0;
+    return {c, cf: Math.min(1, cf), installed:installedRegional};
+  }).sort((a,b)=>b.cf-a.cf);
+
+  const bh = ih/cfs.length - 4;
+  let cfg = '';
+  cfs.forEach((d,j)=>{
+    const yy = PT + j*(bh+4);
+    const w = d.cf * iw;
+    cfg += `<rect x="${PL}" y="${yy}" width="${w}" height="${bh}" fill="${d.c.color}"/>`;
+    cfg += `<text x="${PL-4}" y="${yy+bh*0.7}" font-family="IBM Plex Mono" font-size="9.5" fill="${NAVY}" text-anchor="end">${d.c.nm}</text>`;
+    cfg += `<text x="${PL+w+4}" y="${yy+bh*0.7}" font-family="IBM Plex Mono" font-size="9.5" fill="rgba(5,28,42,.6)">${(d.cf*100).toFixed(1)}%</text>`;
+  });
+  cfg += `<line x1="${PL+iw}" y1="${PT}" x2="${PL+iw}" y2="${PT+ih}" stroke="rgba(5,28,42,.2)" stroke-width=".5" stroke-dasharray="2,2"/>`;
+  cfg += `<text x="${PL+iw}" y="${H-4}" font-family="IBM Plex Mono" font-size="9" fill="rgba(5,28,42,.55)" text-anchor="end">設備容量 100%</text>`;
+  cfsvg.innerHTML = cfg;
+
+  // CO2 timeline
+  const cosvg = document.getElementById('co2-svg');
+  const W2=360,H2=280, PL2=44,PR2=10,PT2=10,PB2=24;
+  const iw2=W2-PL2-PR2, ih2=H2-PT2-PB2;
+  const co2Slice = D.co2.slice(0,N);
+  const yMaxCO2 = Math.max(400, Math.ceil(Math.max(...co2Slice,400)/100)*100 + 100);
+  const x = (idx)=>PL2 + (idx/287)*iw2;
+  const y = (v)=>PT2 + ih2 - (v/yMaxCO2)*ih2;
+  let cog = '';
+  for(let s=0;s<=4;s++){
+    const v = yMaxCO2*s/4, yy = y(v);
+    cog += `<line x1="${PL2}" y1="${yy}" x2="${W2-PR2}" y2="${yy}" stroke="rgba(5,28,42,.08)" stroke-width=".5"/>`;
+    cog += `<text x="${PL2-6}" y="${yy+3}" font-family="IBM Plex Mono" font-size="9" fill="rgba(5,28,42,.5)" text-anchor="end">${v.toFixed(0)}</text>`;
+  }
+  for(let h=0;h<=24;h+=6){
+    cog += `<text x="${x(h*12)}" y="${PT2+ih2+14}" font-family="IBM Plex Mono" font-size="9" fill="rgba(5,28,42,.55)" text-anchor="middle">${String(h).padStart(2,'0')}</text>`;
+  }
+  // not-yet shade
+  cog += `<rect x="${x(i)}" y="${PT2}" width="${PL2+iw2 - x(i)}" height="${ih2}" fill="rgba(5,28,42,.04)"/>`;
+
+  if(N>1){
+    let cp = `M${x(0)},${y(0)}`;
+    for(let k=0;k<N;k++) cp += ` L${x(k)},${y(D.co2[k])}`;
+    cp += ` L${x(i)},${y(0)} Z`;
+    cog += `<path d="${cp}" fill="${NAVY}" opacity=".15"/>`;
+    let rp = '';
+    for(let k=0;k<N;k++) rp += (k===0?'M':' L') + x(k)+','+y(D.co2[k]);
+    cog += `<path d="${rp}" fill="none" stroke="${NAVY}" stroke-width="1.4"/>`;
+  }
+  cog += `<circle cx="${x(i)}" cy="${y(D.co2[i])}" r="3" fill="${CYAN}"/>`;
+  cog += `<text x="${x(i)+5}" y="${y(D.co2[i])-5}" font-family="IBM Plex Mono" font-size="9" fill="${NAVY}">${D.co2[i].toFixed(0)} g/kWh</text>`;
+  const avg = N>0 ? co2Slice.reduce((s,v)=>s+v,0)/N : 0;
+  cog += `<line x1="${PL2}" y1="${y(avg)}" x2="${W2-PR2}" y2="${y(avg)}" stroke="${BLUE}" stroke-width=".7" stroke-dasharray="3,2"/>`;
+  cog += `<text x="${W2-PR2-4}" y="${y(avg)-3}" font-family="IBM Plex Mono" font-size="9" fill="${BLUE}" text-anchor="end">日平均 ${avg.toFixed(0)}</text>`;
+  cosvg.innerHTML = cog;
+
+  // CO2 hover
+  attachHover(cosvg, {
+    slotFromX: (svgX) => {
+      const PL = 44, PR = 10, iwc = 360 - PL - PR;
+      if(svgX < PL || svgX > 360 - PR) return -1;
+      const slot = Math.floor((svgX - PL)/iwc * 287);
+      return Math.max(0, Math.min(STATE.nowSlot, slot));
+    },
+    contentFn: (slot) => buildCO2Tooltip(STATE.D, slot, N)
+  });
+}
+
+/* ============ EX5 REGIONAL VRE MATRIX ============ */
+function renderRegional(){
+  const i = STATE.nowSlot;
+  const N = i+1;
+  const grid = document.getElementById('region-matrix');
+
+  let html = '';
+  REGIONS.forEach(r=>{
+    const RV = STATE.regionViews[r.key];
+    const vreShare = [];
+    for(let k=0;k<N;k++){
+      const d = RV.demand[k];
+      const v = RV.carriers.solar[k]+RV.carriers.wind[k];
+      vreShare.push(d>0 ? Math.min(150, v/d*100) : 0);
+    }
+    const nowShare = vreShare[i];
+    const peak = N>0 ? Math.max(...vreShare) : 0;
+    const peakIdx = vreShare.indexOf(peak);
+    const overflow = peak > 100;
+    const isActive = STATE.region === r.key;
+
+    const W=200, H=64, PL=2, PR=2, PT=4, PB=10;
+    const iw=W-PL-PR, ih=H-PT-PB;
+    const yMax = Math.max(100, Math.ceil(peak/20)*20);
+    const x = (idx)=>PL + (idx/287)*iw;
+    const y = (v)=>PT + ih - (v/yMax)*ih;
+    let g='';
+    // not-yet shade
+    g += `<rect x="${x(i)}" y="${PT}" width="${PL+iw - x(i)}" height="${ih}" fill="rgba(5,28,42,.04)"/>`;
+    // 100% line
+    g += `<line x1="${PL}" y1="${y(100)}" x2="${W-PR}" y2="${y(100)}" stroke="${overflow?'#C84B31':'rgba(5,28,42,.2)'}" stroke-width=".5" stroke-dasharray="${overflow?'':'2,2'}"/>`;
+    // area
+    if(N>1){
+      let ap = `M${x(0)},${y(0)}`;
+      for(let k=0;k<N;k++) ap += ` L${x(k)},${y(vreShare[k])}`;
+      ap += ` L${x(i)},${y(0)} Z`;
+      g += `<path d="${ap}" fill="${CYAN}" opacity=".35"/>`;
+      let lp = '';
+      for(let k=0;k<N;k++) lp += (k===0?'M':' L') + x(k)+','+y(vreShare[k]);
+      g += `<path d="${lp}" fill="none" stroke="${BLUE}" stroke-width="1.2"/>`;
+    }
+    g += `<circle cx="${x(i)}" cy="${y(nowShare)}" r="2" fill="${NAVY}"/>`;
+    for(let h=0;h<=24;h+=6){
+      g += `<text x="${x(h*12)}" y="${H-1}" font-family="IBM Plex Mono" font-size="7" fill="rgba(5,28,42,.45)" text-anchor="middle">${h}</text>`;
+    }
+
+    html += `<div class="rm-cell ${isActive?'active':''}" data-region="${r.key}">
+      <div class="rm-name">${r.name} <span style="font-family:var(--mono);font-size:9px;color:var(--muted);font-weight:400">${r.code}</span></div>
+      <div class="rm-meta"><span>需要ピーク ${r.cap.toFixed(1)} GW</span><span>${overflow?'⚠ 100%超':''}</span></div>
+      <svg class="rm-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${g}</svg>
+      <div class="rm-foot">
+        <span>現在 <span class="v">${nowShare.toFixed(1)}%</span></span>
+        <span>本日最大 ${peak.toFixed(0)}% @ ${slotLabel(peakIdx)}</span>
+      </div>
+    </div>`;
+  });
+  grid.innerHTML = html;
+
+  grid.querySelectorAll('.rm-cell').forEach(cell=>{
+    cell.addEventListener('click', ()=>{
+      const rk = cell.dataset.region;
+      STATE.region = rk;
+      document.getElementById('region-select').value = rk;
+      rebuildView();
+      renderAll();
+    });
+  });
+}
+
+/* ============ MASTER ============ */
+function renderAll(){
+  updateControlBar();
+  renderKPI();
+  renderDispatch();
+  renderResidual();
+  renderLDC();
+  renderMix();
+}
+
+/* ============ EVENTS ============ */
+document.addEventListener('click', e=>{
+  const b = e.target.closest('.btn[data-unit]');
+  if(!b) return;
+  document.querySelectorAll('.btn[data-unit]').forEach(x=>x.classList.remove('act'));
+  b.classList.add('act');
+  STATE.unit = b.dataset.unit;
+  renderDispatch();
+});
+
+document.addEventListener('click', e=>{
+  const b = e.target.closest('.rb[data-range]');
+  if(!b) return;
+  document.querySelectorAll('.rb[data-range]').forEach(x=>x.classList.remove('act'));
+  b.classList.add('act');
+  STATE.rangeMode = b.dataset.range;
+  updateControlBar();
+  renderDispatch();
+  renderResidual();
+});
+
+document.addEventListener('click', e=>{
+  const b = e.target.closest('.rb[data-yfit]');
+  if(!b) return;
+  document.querySelectorAll('.rb[data-yfit]').forEach(x=>x.classList.remove('act'));
+  b.classList.add('act');
+  STATE.yFit = b.dataset.yfit;
+  updateControlBar();
+  renderDispatch();
+  renderResidual();
+});
+
+document.getElementById('region-select').addEventListener('change', e=>{
+  STATE.region = e.target.value;
+  rebuildView();
+  renderAll();
+});
+
+/* ============ BOOT ============ */
+(function(){
+  BASE = { demand: demandCurve(), solar: solarAvail(), wind: windAvail() };
+  // expose BASE for dispatch()
+  window.BASE = BASE;
+  // patch dispatch to read BASE
+  // (already references BASE via closure scope above? we kept it as var BASE — make global)
+  STATE.nowSlot = nowSlotIdx();
+  rebuildView();
+  renderAll();
+  tick();
+  setInterval(tick, 1000);
+  setInterval(()=>{
+    const d = new Date();
+    if(d.getHours()===0 && d.getMinutes()<5){
+      BASE = { demand: demandCurve(), solar: solarAvail(), wind: windAvail() };
+      window.BASE = BASE;
+      rebuildView();
+      renderAll();
+    }
+  }, 60*1000);
+})();
+</script>
+</body>
+</html>

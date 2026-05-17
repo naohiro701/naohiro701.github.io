@@ -1,4 +1,4 @@
-[今日の電力需給実績](https://naohiro701.github.io/electricity/main.html)
+[今日の電力需給実績](https://naohiro701.github.io/electricity/index.html)
 
 [文字数カウンター](https://naohiro701.github.io/others/textCounter.html)
 

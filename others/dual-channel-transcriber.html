@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>通話文字起こしツール — 2チャネル音声の録音と文字起こし</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#051C2A; --blue:#163E93; --cyan:#30A3DA; --ink:#060200;
+  --mute:#5A6772; --rule:#D3DAE0; --soft:#F1F5F8; --bg:#FFFFFF; --warn:#8A4B00;
+  color-scheme:light; box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  font-family:"Noto Sans JP","Hiragino Sans","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  font-size:13px; line-height:1.55; color:var(--ink); background:var(--bg);
+}
+html{height:100%; scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0; height:100%; background:var(--bg)}
+*,*::before,*::after{box-sizing:inherit}
+button,input,select,textarea{font:inherit; color:inherit}
+:focus-visible{outline:2px solid var(--cyan); outline-offset:2px}
+
+.app{display:grid; grid-template-columns:minmax(0,1fr) 312px; grid-template-rows:auto minmax(0,1fr); height:100%}
+header.top{grid-column:1/-1; display:flex; align-items:center; gap:16px; padding:9px 18px 8px; border-bottom:3px solid var(--navy); flex-wrap:wrap}
+.brand h1{margin:0; font-family:"Noto Serif JP",serif; font-weight:700; font-size:20px; color:var(--navy)}
+.brand p{margin:0; font-size:11.5px; color:var(--mute)}
+.actions{display:flex; gap:6px; flex-wrap:wrap; align-items:center}
+.status{display:flex; align-items:center; gap:8px; margin-left:auto; font-size:12px; color:var(--mute)}
+.dot{width:9px; height:9px; border-radius:50%; background:var(--rule)}
+.dot.rec{background:#C0182B; box-shadow:0 0 0 3px rgba(192,24,43,.15)}
+.dot.ok{background:var(--blue)}
+.clock{font-variant-numeric:tabular-nums; color:var(--navy); font-weight:700; font-size:14px; min-width:64px}
+.btn{border:1px solid var(--navy); background:#fff; color:var(--navy); padding:6px 12px; border-radius:2px; cursor:pointer; font-weight:500; font-size:12.5px; white-space:nowrap}
+.btn:hover{background:var(--soft)}
+.btn.primary{background:var(--navy); color:#fff}
+.btn.primary:hover{background:#0B2D42}
+.btn:disabled{opacity:.38; cursor:not-allowed}
+.btn.ghost{border-color:var(--rule)}
+.btn.sm{padding:2px 8px; font-size:11.5px}
+.menu{position:relative}
+.menu summary{list-style:none}
+.menu summary::-webkit-details-marker{display:none}
+.menu-list{position:absolute; right:0; top:calc(100% + 4px); background:#fff; border:1px solid var(--navy); z-index:30; min-width:250px; max-height:60vh; overflow:auto; padding:4px 0}
+.menu-list button{display:block; width:100%; text-align:left; background:none; border:0; padding:7px 12px; cursor:pointer; font-size:12.5px}
+.menu-list button:hover{background:var(--soft)}
+.menu-list small{display:block; color:var(--mute); font-size:11px}
+.hist{display:grid; grid-template-columns:1fr auto auto; gap:4px; align-items:center; padding:6px 10px; border-bottom:1px solid #EDF1F4; font-size:12px; min-width:360px}
+.hist small{display:block; color:var(--mute); font-size:10.5px}
+.hist button{width:auto; padding:2px 8px; border:1px solid var(--rule); border-radius:2px}
+
+main{display:grid; grid-template-rows:auto minmax(0,1fr); gap:10px; padding:10px 16px 12px; min-height:0; min-width:0}
+.exh{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin:0 0 5px}
+.exh .ex{font-size:11px; color:var(--blue); font-weight:700}
+.exh h2{margin:0; font-family:"Noto Serif JP",serif; font-weight:700; font-size:15px; color:var(--navy)}
+.exh .sub{font-size:11.5px; color:var(--mute)}
+.exh .right{margin-left:auto; display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+.tl-card{border-top:1px solid var(--navy); padding-top:7px}
+#mini{display:block; width:100%; height:18px; cursor:pointer}
+#tl{display:block; width:100%; height:128px; cursor:grab; touch-action:none}
+#tl.drag{cursor:grabbing}
+.legend{display:flex; gap:14px; flex-wrap:wrap; font-size:11px; color:var(--mute); margin-top:3px}
+.sw{display:inline-block; width:14px; height:8px; margin-right:5px; vertical-align:middle}
+.meters{display:flex; gap:8px; align-items:center; font-size:11px; color:var(--mute)}
+.meter{width:64px; height:6px; background:var(--soft); position:relative; overflow:hidden}
+.meter i{position:absolute; left:0; top:0; bottom:0; width:0}
+.silbadge{font-size:12px; font-weight:700; color:var(--warn); border:1px solid var(--warn); padding:0 8px; border-radius:2px}
+#player{height:30px; max-width:280px}
+
+.lower{display:grid; grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr); gap:18px; min-height:0}
+.col{display:grid; grid-template-rows:auto minmax(0,1fr) auto; min-height:0; border-top:1px solid var(--navy); padding-top:7px}
+.col.stats{grid-template-rows:auto auto minmax(0,1fr)}
+.search{display:flex; gap:4px; align-items:center}
+.search input{width:150px; padding:2px 6px; border:1px solid var(--rule); border-radius:2px; font-size:12px}
+.seg2{display:inline-flex; border:1px solid var(--rule); border-radius:2px; overflow:hidden}
+.seg2 button{border:0; background:#fff; padding:2px 8px; font-size:11.5px; cursor:pointer; color:var(--mute)}
+.seg2 button[aria-pressed="true"]{background:var(--navy); color:#fff}
+#txBox{overflow:auto; min-height:0; position:relative}
+#txInner{position:relative; width:100%}
+.utt{position:absolute; left:0; right:0; display:grid; grid-template-columns:70px 1fr; gap:0 10px; padding:6px 8px 6px 10px; border-left:3px solid transparent; cursor:pointer}
+.utt.a{border-left-color:var(--blue)} .utt.c{border-left-color:var(--cyan)}
+.utt:hover{background:#F7FAFC}
+.utt.sel{background:var(--soft)}
+.utt .tm{font-variant-numeric:tabular-nums; color:var(--mute); font-size:11.5px; padding-top:2px}
+.utt .who{display:block; font-weight:700; font-size:12px}
+.utt.a .who{color:var(--blue)} .utt.c .who{color:#1B7FAE}
+.utt .tx{font-size:14px; line-height:1.55; word-break:break-all}
+.utt mark{background:#DCEBFA; color:var(--navy); padding:0 1px}
+.utt mark.q{background:#FFE9A8}
+.tag{display:inline-block; font-size:10.5px; font-weight:500; padding:0 5px; margin-left:6px; border:1px solid var(--rule); color:var(--mute); border-radius:2px}
+.utt.dup .tx{color:#9AA4AC; text-decoration:line-through}
+#txInterim{border-top:1px dashed var(--rule)}
+.interim{padding:4px 10px; color:var(--mute); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.empty{color:var(--mute); padding:18px 6px; max-width:52ch}
+#btnLatest{position:sticky; float:right; bottom:8px; margin-right:8px}
+
+.tabs{display:flex; border-bottom:1px solid var(--rule)}
+.tabs button{background:none; border:0; padding:6px 12px 7px; cursor:pointer; color:var(--mute); font-weight:500; border-bottom:2px solid transparent; margin-bottom:-1px}
+.tabs button[aria-selected="true"]{color:var(--navy); border-bottom-color:var(--navy)}
+.panel{overflow:auto; min-height:0; padding-top:8px}
+table.m{width:100%; border-collapse:collapse; font-size:12.5px}
+table.m th{font-weight:500; color:var(--mute); text-align:right; font-size:11px; border-bottom:1px solid var(--navy); padding:4px 6px}
+table.m th:first-child{text-align:left}
+table.m td{padding:4px 6px; border-bottom:1px solid #EDF1F4; vertical-align:top}
+table.m td.v{font-variant-numeric:tabular-nums; font-weight:700; color:var(--navy); white-space:nowrap; text-align:right}
+table.m td.v.r{color:var(--blue); font-weight:500}
+table.m td small{display:block; color:var(--mute); font-size:10.5px; line-height:1.35}
+.grp td{background:var(--soft); font-weight:700; color:var(--navy); font-size:11.5px}
+.share{display:flex; height:10px; margin:4px 0 8px}
+.warnbox{border-left:3px solid var(--warn); background:#FBF6EE; padding:6px 10px; font-size:12px; margin:0 0 8px; color:#3B2A12}
+.kv{display:grid; grid-template-columns:132px 1fr; gap:3px 10px; font-size:12px; margin:0}
+.kv dt{color:var(--mute)} .kv dd{margin:0; word-break:break-all; font-variant-numeric:tabular-nums}
+.hash{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:10.5px}
+.panel h4{font-size:12.5px; color:var(--navy); margin:12px 0 4px}
+.panel p.note{font-size:11.5px; color:var(--mute); margin:6px 0; max-width:74ch}
+.method p{margin:3px 0 7px; font-size:12px; max-width:78ch}
+.bar{height:6px; background:var(--soft); margin-top:2px}
+.bar i{display:block; height:100%; background:var(--blue)}
+
+aside{border-left:1px solid var(--rule); padding:8px 14px; overflow:auto; min-height:0; display:flex; flex-direction:column; gap:5px}
+aside h3{margin:5px 0 1px; font-size:12px; color:var(--navy); font-weight:700; border-bottom:1px solid var(--navy); padding-bottom:2px; display:flex; justify-content:space-between; align-items:baseline}
+aside h3 span{font-weight:400; color:var(--mute); font-size:10.5px}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:5px 12px}
+.field{display:flex; flex-direction:column; gap:1px; min-width:0}
+.field label{font-size:11px; color:var(--mute); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.field select,.field input[type=text]{width:100%; padding:2px 4px; border:1px solid var(--rule); background:#fff; border-radius:2px; font-size:12px}
+.prm{display:grid; grid-template-columns:minmax(0,1fr) 58px; align-items:center; gap:0 4px; min-width:0}
+.prm label{font-size:11px; color:var(--mute); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.prm label .u{font-size:10px; color:#8A959E}
+.prm input[type=number]{width:58px; padding:1px 4px; border:1px solid var(--rule); border-radius:2px; font-size:12px; text-align:right; font-variant-numeric:tabular-nums; color:var(--navy)}
+.prm input[type=range]{grid-column:1/-1; width:100%; height:13px; margin:0; accent-color:var(--blue)}
+.toggles{display:flex; flex-wrap:wrap; gap:3px 12px; font-size:11.5px; margin-top:4px}
+.toggles label{display:flex; align-items:center; gap:4px; cursor:pointer}
+.toggles input{accent-color:var(--blue); margin:0}
+textarea#kw{width:100%; height:44px; resize:none; border:1px solid var(--rule); border-radius:2px; font-size:12px; padding:3px 5px}
+.side-foot{display:flex; gap:6px; margin-top:2px}
+.locked{opacity:.55; pointer-events:none}
+.progress{height:3px; background:var(--soft); position:relative; overflow:hidden; margin-top:4px}
+.progress i{position:absolute; left:0; top:0; bottom:0; background:var(--blue); width:0}
+#toast{position:fixed; left:50%; bottom:calc(18px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%); background:var(--navy); color:#fff; padding:8px 14px; font-size:12.5px; border-radius:2px; opacity:0; transition:opacity .2s; pointer-events:none; max-width:min(92vw,680px); z-index:60}
+#toast.on{opacity:1}
+.sr-only{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)}
+@media (max-width:1050px){
+  .app{grid-template-columns:1fr; grid-template-rows:auto auto auto; height:auto}
+  aside{border-left:0; border-top:3px solid var(--navy)}
+  .lower{grid-template-columns:1fr}
+  #txBox,.panel{max-height:62vh}
+}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <h1>通話文字起こしツール</h1>
+      <p>マイクと共有音声を別チャネルで記録・可視化。文字起こしの対応状況はブラウザによって異なります。</p>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="btnStart">収録を開始</button>
+      <button class="btn" id="btnStop" disabled>停止</button>
+      <button class="btn ghost" id="btnDemo">デモを表示</button>
+      <button class="btn ghost" id="btnStress" title="合成データを使用する開発・検証用の負荷試験。実際の通話音声は生成しません。">長時間テスト</button>
+      <details class="menu" id="histMenu"><summary class="btn ghost" role="button">履歴</summary><div class="menu-list" id="histList"></div></details>
+      <details class="menu" id="expMenu">
+        <summary class="btn ghost" role="button">書き出し</summary>
+        <div class="menu-list">
+          <button data-exp="txt">会話ログ TXT</button>
+          <button data-exp="csv">文字起こし CSV</button>
+          <button data-exp="srt">字幕 SRT</button>
+          <button data-exp="vtt">字幕 WebVTT</button>
+          <button data-exp="kpi">指標 CSV</button>
+          <button data-exp="json">セッション JSON<small>発話本文・音響特徴・時刻・パラメータ等を含むため、共有前に確認</small></button>
+          <button data-exp="zip">音声 ZIP<small>録音時の形式で分割保存。左=自分 / 右=相手</small></button>
+           <button data-exp="mp3">音声 MP3（1本）<small>左右の話者を維持して1つのMP3に変換。初回はエンコーダの読込が必要</small></button>
+          <button data-exp="html">このアプリの HTML<small>ソースコードを含む単一HTML</small></button>
+          <button data-exp="open">セッション JSON を開く…</button>
+        </div>
+      </details>
+      <input type="file" id="fileIn" accept=".json,application/json" class="sr-only">
+    </div>
+    <div class="status" aria-live="polite">
+      <span class="dot" id="dot"></span><span id="statusTx">待機中</span><span class="clock" id="clock">0:00:00</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="tl-card" aria-label="話者タイムライン">
+      <div class="exh">
+        <span class="ex">01</span><h2>話者タイムライン</h2>
+        <span class="sub">上の帯 = 通話全体。ホイールで拡大、ドラッグで移動</span>
+        <div class="right">
+          <span class="silbadge" id="silBadge" hidden></span>
+          <div class="meters"><span id="mLblA">自分</span><div class="meter"><i id="mA" style="background:var(--blue)"></i></div><span id="mLblC">相手</span><div class="meter"><i id="mC" style="background:var(--cyan)"></i></div></div>
+          <button class="btn ghost sm" id="btnFollow" hidden>ライブ追従</button>
+          <audio id="player" controls hidden></audio>
+        </div>
+      </div>
+      <canvas id="mini" aria-label="通話全体の概観"></canvas>
+      <canvas id="tl" aria-label="発話区間のタイムライン"></canvas>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--blue)"></i><span class="nA">自分</span></span>
+        <span><i class="sw" style="background:var(--cyan)"></i><span class="nC">相手</span></span>
+        <span><i class="sw" style="background:#fff;border:1px solid var(--navy)"></i>相槌</span>
+        <span><i class="sw" style="background:#F3E6D2"></i>沈黙</span>
+        <span><i class="sw" style="background:#8A4B00"></i>割り込み</span>
+        <span><i class="sw" style="background:#AEB8C0"></i>エコーゲート棄却</span>
+      </div>
+    </section>
+
+    <section class="lower">
+      <div class="col">
+        <div class="exh">
+          <span class="ex">02</span><h2>文字起こし</h2><span class="sub" id="txCount"></span>
+          <div class="right">
+            <div class="search"><input id="q" type="search" placeholder="検索して Enter" aria-label="文字起こし内検索"><span class="sub" id="qInfo"></span></div>
+            <div class="seg2" role="group" aria-label="時刻表示"><button id="tmEl" aria-pressed="true">経過</button><button id="tmCl" aria-pressed="false">時刻</button></div>
+          </div>
+        </div>
+        <div id="txBox" tabindex="0" aria-label="文字起こし一覧">
+          <div id="txInner"></div>
+          <p class="empty" id="txEmpty">収録を開始するか、デモ通話を読み込むと、話者ごとの発話がここに追記されていきます。</p>
+          <button class="btn sm" id="btnLatest" hidden>最新へ</button>
+        </div>
+        <div id="txInterim"></div>
+      </div>
+      <div class="col stats">
+        <div class="exh"><span class="ex">03</span><h2>分析と記録</h2></div>
+        <div class="tabs" role="tablist">
+          <button role="tab" aria-selected="true" data-tab="kpi">会話指標</button>
+          <button role="tab" aria-selected="false" data-tab="mem">メモリと保存</button>
+          <button role="tab" aria-selected="false" data-tab="repro">品質と再現性</button>
+        </div>
+        <div class="panel" id="panel"></div>
+      </div>
+    </section>
+  </main>
+
+  <aside aria-label="パラメータ">
+    <h3>入力 <span>収録中は固定</span></h3>
+    <div id="inputGroup">
+      <div class="grid2">
+        <div class="field"><label for="i_nA">自分の表示名</label><input type="text" id="i_nA" value="自分"></div>
+        <div class="field"><label for="i_nC">相手の表示名</label><input type="text" id="i_nC" value="相手"></div>
+        <div class="field"><label for="i_mic">自分のマイク</label><select id="i_mic"><option value="">既定のマイク</option></select></div>
+        <div class="field"><label for="i_psrc">相手の音声</label><select id="i_psrc"><option value="display">タブ/画面共有</option><option value="device">仮想入力デバイス</option></select></div>
+        <div class="field"><label for="i_pdev">相手用デバイス</label><select id="i_pdev" disabled><option value="">—</option></select></div>
+        <div class="field"><label for="i_asrP">相手側の音声認識</label><select id="i_asrP"><option value="auto">自動判定</option><option value="force">強制ON</option><option value="off">OFF</option></select></div>
+        <div class="field"><label for="i_kbps">音声ビットレート</label><select id="i_kbps"><option value="24">24 kbps（9h≈97MB）</option><option value="32" selected>32 kbps（9h≈130MB）</option><option value="48">48 kbps</option><option value="64">64 kbps</option></select></div>
+        <div class="field"><label for="i_seg">音声の分割</label><select id="i_seg"><option value="5">5 分ごと</option><option value="10" selected>10 分ごと</option><option value="30">30 分ごと</option></select></div>
+      </div>
+      <div class="toggles">
+        <label><input type="checkbox" id="i_ec" checked>エコー除去</label>
+        <label><input type="checkbox" id="i_ns" checked>雑音抑圧</label>
+        <label><input type="checkbox" id="i_agc">自動利得</label>
+        <label><input type="checkbox" id="i_rec" checked>音声を保存</label>
+        <label><input type="checkbox" id="i_wake" checked>スリープ防止</label>
+        <label><input type="checkbox" id="i_ondev">端末内認識</label>
+      </div>
+      <div class="field" style="margin-top:3px"><button class="btn ghost sm" id="btnDevices">デバイス一覧を更新</button></div>
+    </div>
+    <h3>発話区間検出 <span>変更は以降に適用し記録</span></h3>
+    <div class="grid2" id="g_vad"></div>
+    <h3>対応付けと指標 <span>全区間に遡及</span></h3>
+    <div class="grid2" id="g_post"></div>
+    <h3>キーワード <span>読点・改行区切り</span></h3>
+    <textarea id="kw" aria-label="検出キーワード" placeholder="必要に応じて、検出するキーワードを読点・改行で区切って入力"></textarea>
+    <div class="side-foot">
+      <button class="btn ghost sm" id="btnReset">既定値に戻す</button>
+      <button class="btn ghost sm" id="btnCopyP">パラメータを複製</button>
+    </div>
+    <p class="note" style="font-size:11px;color:var(--mute);margin:6px 0 0">録音・文字起こしは参加者の了承を得て使用してください。録音と文字起こしはこのブラウザ内に保存されます。音声認識はブラウザの外部サービスを使用する場合があります。MP3変換は初回に外部エンコーダの読込が必要です。</p>
+    <div class="progress" id="prog" hidden><i id="progBar"></i></div>
+  </aside>
+</div>
+<div id="toast" role="status"></div>
+
+<script>
+(() => {
+'use strict';
+// Capture the original HTML synchronously before device enumeration or session access.
+// Do not serialize the live DOM: it may contain transcripts or device labels.
+const cleanHtmlSnapshot='<!DOCTYPE html>\n'+document.documentElement.outerHTML;
+/** Return immutable application HTML without later user or session data. */
+function getAppHtml(){ return cleanHtmlSnapshot; }
+const APP_VERSION = '1.1.0', SCHEMA = 'callscribe/1'; // Keep the existing schema and IndexedDB name for import/history compatibility.
+const K = Object.freeze({
+  CHUNK_S:15, CACHE_CHUNKS:80, LOOKBACK_S:30, TOL_S:0.15, CHAIN_GAP_S:2.0, BC_RESUME_S:1.0, ACTIVE_RISE:0.1, QMIN:-12000,
+  EST_CHAR_PER_S:6, EST_MIN_S:0.3, DEDUP_WIN_S:3, PENDING_S:2.5, WD_IDLE_S:15, WD_SPEECH_S:6, PART_MS:5000, SIGFIG:12, AIZ_MAXLEN:12 });
+const VADP = [
+  {k:'thOn', label:'開始閾値', unit:'dB', min:3, max:30, step:0.5, def:12, help:'ノイズフロアからの超過量。超えると発話開始'},
+  {k:'thOff', label:'継続閾値', unit:'dB', min:1, max:25, step:0.5, def:7, help:'発話中はこの超過量を下回るまで継続（ヒステリシス）'},
+  {k:'hang', label:'保持時間', unit:'ms', min:0, max:400, step:10, def:80, help:'閾値割れ後も発話扱いを保つ時間。区間終端は最後の超過フレームに戻す'},
+  {k:'minSeg', label:'最小区間', unit:'ms', min:0, max:500, step:10, def:120, help:'これ未満の区間は雑音として除去'},
+  {k:'floorRise', label:'フロア', unit:'dB/s', min:0.1, max:5, step:0.1, def:1, help:'ノイズフロア上昇速度。発話中は 1/10'},
+  {k:'echoMargin', label:'ゲート', unit:'dB', min:0, max:30, step:1, def:10, help:'相手の発話中のみ自分側の閾値に加算。スピーカー漏れ込み対策'},
+  {k:'pauseMin', label:'ポーズ', unit:'ms', min:100, max:1000, step:10, def:250, help:'これ以上の無音で発話区間 (IPU) を分割'},
+];
+const POSTP = [
+  {k:'deadAir', label:'沈黙判定', unit:'s', min:1, max:15, step:0.5, def:3, help:'両者とも無発話がこれ以上続けば沈黙として計上'},
+  {k:'intrMs', label:'割り込み', unit:'ms', min:0, max:1500, step:50, def:300, help:'話者交替時の重なりがこれ以上なら割り込み'},
+  {k:'bcMax', label:'相槌上限', unit:'ms', min:0, max:2500, step:50, def:1000, help:'これ未満かつ相槌語のみ（はい/ええ/なるほど 等）の割り込みで、元話者が 1 s 以内に再開すれば相槌'},
+  {k:'asrLat', label:'ASR遅延', unit:'ms', min:0, max:2000, step:50, def:600, help:'音響区間が見つからない確定結果の時刻推定に使用'},
+  {k:'dedupJ', label:'重複 J', unit:'', min:0.2, max:1, step:0.05, def:0.5, help:'自分側の区間なし確定結果が ±3 s 内の相手発話と文字 bigram Jaccard ≥ この値なら漏れ込み重複として除外'},
+  {k:'recentMin', label:'直近窓', unit:'分', min:1, max:60, step:1, def:10, help:'指標の「直近」列の集計窓'},
+];
+const P = {}; [...VADP, ...POSTP].forEach(p => P[p.k] = p.def);
+const vadParams = () => Object.fromEntries(VADP.map(p => [p.k, P[p.k]]));
+const postParams = () => Object.fromEntries(POSTP.map(p => [p.k, P[p.k]]));
+
+// ---------- utils ----------
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function fmtH(t){ if(!Number.isFinite(t)) return '–'; t=Math.max(0,t); const h=Math.floor(t/3600), m=Math.floor(t%3600/60), s=Math.floor(t%60); return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; }
+function fmtSub(t, sep){ t=Math.max(0,t); const h=Math.floor(t/3600), m=Math.floor(t%3600/60), s=Math.floor(t%60), ms=Math.floor((t-Math.floor(t))*1000); return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}${sep}${String(ms).padStart(3,'0')}`; }
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function gauss(r){ let u=0; while(u===0) u=r(); const v=r(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+function quantile(sorted,q){ if(!sorted.length) return NaN; const pos=(sorted.length-1)*q, lo=Math.floor(pos), hi=Math.ceil(pos); return sorted[lo]+(sorted[hi]-sorted[lo])*(pos-lo); }
+const median = a => quantile([...a].sort((x,y)=>x-y), .5);
+function toast(msg, ms=3600){ const t=$('#toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toast._h); toast._h=setTimeout(()=>t.classList.remove('on'), ms); }
+const tick = () => new Promise(r => setTimeout(r, 0));
+const heapMB = () => performance.memory ? performance.memory.usedJSHeapSize/1048576 : NaN;
+// lower bound by end >= x (sorted, non-overlapping lists)
+function lbE(L,x){ let lo=0, hi=L.length; while(lo<hi){ const m=(lo+hi)>>1; if(L[m].e<x) lo=m+1; else hi=m; } return lo; }
+function lbT(L,x){ let lo=0, hi=L.length; while(lo<hi){ const m=(lo+hi)>>1; if(L[m].t<x) lo=m+1; else hi=m; } return lo; }
+function lbS(L,x){ let lo=0, hi=L.length; while(lo<hi){ const m=(lo+hi)>>1; if(L[m].s<x) lo=m+1; else hi=m; } return lo; }
+
+// Japanese text features
+const normJ = t => String(t).replace(/[\s、。，．,.!！?？・「」『』（）()…‥:：;；"'“”]/g,'');
+const AIZ = /^(はい|ええ|うん|そう(です|でございます)?(ね|か|よね)?|なるほど(です)?(ね)?|へえ|ああ|あー|ほう|はあ|おお|ええと|さようでございますか|左様でございますか)+$/;
+const FILL = /(えーと|えっと|えー+|あのー+|うーん|んー)/g;
+function bigr(s){ const b=new Set(); if(s.length<2){ if(s) b.add(s); return b; } for(let i=0;i<s.length-1;i++) b.add(s.slice(i,i+2)); return b; }
+function jac(a,b){ if(!a.size||!b.size) return 0; let i=0; for(const x of a) if(b.has(x)) i++; return i/(a.size+b.size-i); }
+let KW = [];
+function parseKW(){ KW=[...new Set($('#kw').value.split(/[、,\n]/).map(s=>s.trim()).filter(s=>s.length>=2))]; }
+function kwHits(norm){ if(!KW.length) return null; let o=null; for(let i=0;i<KW.length;i++){ const k=normJ(KW[i]); if(!k) continue; let c=0, p=norm.indexOf(k); while(p>=0){ c++; p=norm.indexOf(k,p+k.length); } if(c){ (o||(o={}))[i]=c; } } return o; }
+
+// ---------- IndexedDB (disk-backed, append-only) ----------
+const IDB = { db:null, ok:false, fail:0,
+  open(){ return new Promise(res=>{ let rq; try{ rq=indexedDB.open('callscribe',1); }catch(e){ return res(false); }
+    rq.onupgradeneeded=()=>{ const d=rq.result;
+      d.createObjectStore('sessions',{keyPath:'sid'}); d.createObjectStore('frames',{keyPath:['sid','k']});
+      d.createObjectStore('finals',{keyPath:['sid','n']}); d.createObjectStore('audio',{keyPath:['sid','seg','part']}); d.createObjectStore('aseg',{keyPath:['sid','seg']}); };
+    rq.onsuccess=()=>{ this.db=rq.result; this.ok=true; res(true); }; rq.onerror=()=>res(false); rq.onblocked=()=>res(false); }); },
+  tx(store,mode,fn){ return new Promise((res,rej)=>{ try{ const t=this.db.transaction(store,mode), rq=fn(t.objectStore(store));
+      t.oncomplete=()=>res(rq?rq.result:undefined); t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error); }catch(e){ rej(e); } }); },
+  put(store,v){ if(!this.ok) return Promise.resolve(); return this.tx(store,'readwrite',s=>{ s.put(v); return null; }).catch(e=>{ this.fail++; storeError(e); }); },
+  q:new Map(), pending:0,
+  enqueue(store,v){ if(!this.ok) return; let a=this.q.get(store); if(!a){ a=[]; this.q.set(store,a); } a.push(v); },
+  flush(){ if(!this.ok||!this.q.size) return Promise.resolve(); const data=this.q, stores=[...data.keys()]; this.q=new Map(); this.pending++;
+    return new Promise(res=>{ const done=err=>{ this.pending--; if(err){ this.fail++; storeError(err); } res(); };
+      try{ const t=this.db.transaction(stores,'readwrite'); for(const st of stores){ const os=t.objectStore(st); for(const v of data.get(st)) os.put(v); }
+        t.oncomplete=()=>done(); t.onerror=()=>done(t.error); t.onabort=()=>done(t.error); }catch(e){ done(e); } }); },
+  get(store,key){ return this.tx(store,'readonly',s=>s.get(key)); },
+  range(store,lo,hi){ return this.tx(store,'readonly',s=>s.getAll(IDBKeyRange.bound(lo,hi))); },
+  all(store){ return this.tx(store,'readonly',s=>s.getAll()); },
+  delRange(store,lo,hi){ return this.tx(store,'readwrite',s=>{ s.delete(IDBKeyRange.bound(lo,hi)); return null; }); },
+};
+let storeErrShown=false;
+function storeError(e){ if(S) S.quality.storeFail++; if(!storeErrShown){ storeErrShown=true; toast('ディスク保存に失敗しました（容量不足の可能性）: '+(e?.name||e)+'。文字起こしは継続します',8000); } }
+class IdbFrames { constructor(sid){ this.sid=sid; this.n=0; }
+  put(k,a,b){ this.n=Math.max(this.n,k+1); IDB.enqueue('frames',{sid:this.sid,k,a,b}); return Promise.resolve(); }
+  get(k){ return IDB.get('frames',[this.sid,k]); }
+  batch(k0,k1){ return IDB.range('frames',[this.sid,k0],[this.sid,k1]); } }
+class MemFrames { constructor(){ this.m=[]; this.n=0; }
+  put(k,a,b){ this.m[k]={k,a,b}; this.n=Math.max(this.n,k+1); return Promise.resolve(); }
+  get(k){ return Promise.resolve(this.m[k]||null); }
+  batch(k0,k1){ return Promise.resolve(this.m.slice(k0,k1+1).filter(Boolean)); } }
+
+// ---------- streaming VAD (causal; identical code for live and offline) ----------
+class StreamVAD {
+  constructor(ch,dt,out){ this.ch=ch; this.dt=dt; this.out=out; this.i=0; this.floor=Infinity; this.on=false; this.hc=0; this.runS=-1; this.lastRaw=-1; this.pend=null; this.n=0; }
+  step(e,gateOn,Pp){
+    const dt=this.dt;
+    this.floor=Math.min(e, this.floor+Pp.floorRise*dt*(this.on?K.ACTIVE_RISE:1)); if(this.floor<-120) this.floor=-120;
+    const add=gateOn?Pp.echoMargin:0, th=this.floor+(this.on?Pp.thOff:Pp.thOn), r=e>th+add, gated=!r&&add>0&&e>th;
+    this.on=r; let act=false;
+    if(r){ act=true; this.hc=Math.round(Pp.hang/1000/dt); this.lastRaw=this.i; } else if(this.hc>0){ act=true; this.hc--; }
+    if(act){ if(this.runS<0) this.runS=this.i; }
+    else if(this.runS>=0){ this.close(this.runS,this.lastRaw+1,Pp); this.runS=-1; }
+    if(this.pend && (this.i+1-this.pend.eF)*dt>=Pp.pauseMin/1000 && (this.runS<0 || (this.runS-this.pend.eF)*dt>=Pp.pauseMin/1000)) this.emit();
+    this.i++; return act?(gated?3:1):(gated?2:0);
+  }
+  close(sF,eF,Pp){ const dt=this.dt; if((eF-sF)*dt<Pp.minSeg/1000) return;
+    if(this.pend && (sF-this.pend.eF)*dt<Pp.pauseMin/1000) this.pend.eF=eF; else { if(this.pend) this.emit(); this.pend={sF,eF}; } }
+  emit(){ const p=this.pend; this.pend=null; this.out.push({id:(this.ch?'C':'A')+(this.n++), ch:this.ch, s:p.sF*this.dt, e:p.eF*this.dt, chars:0, claimed:false, lex:false, bc:false}); }
+  flush(Pp){ if(this.runS>=0){ this.close(this.runS,this.lastRaw+1,Pp); this.runS=-1; } if(this.pend) this.emit(); }
+  provisional(){ const a=this.pend?this.pend.sF:(this.runS>=0?this.runS:-1); if(a<0) return null; return {s:a*this.dt, e:(this.runS>=0?this.i:this.pend.eF)*this.dt}; }
+}
+class Engine {
+  constructor(dt,P0,log){ this.dt=dt; this.P={...P0}; this.log=log; this.li=0; this.i=0; this.ipus=[[],[]];
+    this.v=[new StreamVAD(0,dt,this.ipus[0]), new StreamVAD(1,dt,this.ipus[1])]; this.act=[false,false];
+    this.CF=Math.round(K.CHUNK_S/dt); this.buf=[new Int16Array(this.CF),new Int16Array(this.CF)]; this.bn=0; this.onChunk=null;
+    this.gated=[]; this.gOpen=-1; this.lastQ=[K.QMIN,K.QMIN]; }
+  push(q0,q1){
+    while(this.li<this.log.length && this.log[this.li].f<=this.i){ Object.assign(this.P,this.log[this.li].p); this.li++; }
+    const rc=this.v[1].step(q1/100,false,this.P), ra=this.v[0].step(q0/100,(rc&1)===1,this.P);
+    this.act[0]=(ra&1)===1; this.act[1]=(rc&1)===1;
+    const g=(ra&2)===2; if(g&&this.gOpen<0) this.gOpen=this.i; if(!g&&this.gOpen>=0){ this.gated.push({s:this.gOpen*this.dt,e:this.i*this.dt}); this.gOpen=-1; }
+    this.buf[0][this.bn]=q0; this.buf[1][this.bn]=q1; this.lastQ[0]=q0; this.lastQ[1]=q1; this.bn++; this.i++;
+    if(this.bn===this.CF){ const k=(this.i/this.CF)-1; if(this.onChunk) this.onChunk(k,this.buf[0],this.buf[1]); this.buf=[new Int16Array(this.CF),new Int16Array(this.CF)]; this.bn=0; }
+  }
+  finish(){ this.v.forEach(v=>v.flush(this.P)); if(this.gOpen>=0){ this.gated.push({s:this.gOpen*this.dt,e:this.i*this.dt}); this.gOpen=-1; }
+    if(this.bn && this.onChunk) this.onChunk(Math.floor(this.i/this.CF),this.buf[0].slice(0,this.bn),this.buf[1].slice(0,this.bn)); }
+  frameAt(ch,i,cache){ const k=Math.floor(i/this.CF); if(i>=this.i) return null;
+    if(k===Math.floor(this.i/this.CF) && this.bn>0 && i>=this.i-this.bn) return this.buf[ch][i-(this.i-this.bn)];
+    const c=cache.get(k); return c ? (ch?c.b:c.a)[i-k*this.CF] : undefined; }
+}
+
+// ---------- session ----------
+let S=null, L=null, DV=null, H=null;
+function mkSession({sid, source, meta, P0, log, persistent}){
+  const s={ sid: sid || ('S'+Date.now().toString(36)), source, meta, dt:meta.N/meta.fs, P0:{...P0}, log: log||[], finals:[[],[]], nFin:0,
+    persistent: persistent && IDB.ok, aseg:[], cache:new Map(), loading:new Set(), dirty:true, hashes:null,
+    quality:{restarts:[0,0], gapS:[0,0], watchdog:[0,0], storeFail:0, drift:null} };
+  s.store = s.persistent ? new IdbFrames(s.sid) : new MemFrames();
+  s.eng = new Engine(s.dt, s.P0, s.log);
+  s.eng.onChunk = (k,a,b) => { s.store.put(k,a,b); cacheSet(s,k,{k,a,b}); };
+  return s;
+}
+function cacheSet(s,k,v){ s.cache.delete(k); s.cache.set(k,v); while(s.cache.size>K.CACHE_CHUNKS) s.cache.delete(s.cache.keys().next().value); }
+function cacheLoad(s,k){ if(s.cache.has(k)||s.loading.has(k)||k<0||k>=s.store.n) return; s.loading.add(k);
+  s.store.get(k).then(v=>{ s.loading.delete(k); if(v){ cacheSet(s,k,v); dirty=true; } }).catch(()=>s.loading.delete(k)); }
+function addFinal(s, ch, t, text, conf, persist){
+  const norm=normJ(text), u={id:'u'+s.nFin, n:s.nFin++, ch, t, text, conf, norm, chars:norm.length,
+    aiz: norm.length<=K.AIZ_MAXLEN && AIZ.test(norm), fil:(norm.match(FILL)||[]).length, kw:kwHits(norm), ipus:[], s:t, e:t, est:true, dup:false, pending:false};
+  s.finals[ch].push(u);
+  if(persist && s.persistent) IDB.enqueue('finals',{sid:s.sid, n:u.n, ch, t, text, conf});
+  s.dirty=true; return u;
+}
+function sessionRec(s,status){ return { sid:s.sid, source:s.source, meta:s.meta, P0:s.P0, log:s.log, post:postParams(), keywords:$('#kw').value,
+  status, dur:s.eng.i*s.dt, nFin:s.nFin, updated:new Date().toISOString(), quality:s.quality, app_version:APP_VERSION }; }
+function saveRec(s,status){ if(s?.persistent) return IDB.put('sessions',sessionRec(s,status||s.status||'done')); return Promise.resolve(); }
+
+// ---------- derivation (post-hoc, retroactive; O(n) in #IPU and #finals, no frame scans) ----------
+function associate(ipus, us, Q, now, isLive){
+  let j=0, prevEnd=0;
+  for(const u of us){
+    const cand=[]; while(j<ipus.length && ipus[j].e<=u.t+K.TOL_S){ if(ipus[j].e>=u.t-K.LOOKBACK_S) cand.push(ipus[j]); j++; }
+    let k=cand.length-1; while(k>0 && cand[k].s-cand[k-1].e<=K.CHAIN_GAP_S) k--;
+    u.ipus = cand.length ? cand.slice(Math.max(0,k)) : [];
+    u.pending=false;
+    if(u.ipus.length){ u.s=u.ipus[0].s; u.e=u.ipus[u.ipus.length-1].e; u.est=false; }
+    else {
+      u.est=true; u.pending = isLive && (now-u.t) < K.PENDING_S;
+      const i=lbE(ipus,u.t); const inside = i<ipus.length && ipus[i].s<u.t ? ipus[i] : null; // final arrived mid-IPU
+      if(inside){ u.s=Math.max(prevEnd,inside.s); u.e=Math.max(u.s,u.t-0.1); }
+      else { u.e=Math.max(prevEnd,u.t-Q.asrLat/1000); u.s=Math.max(prevEnd,u.e-Math.max(K.EST_MIN_S,u.chars/K.EST_CHAR_PER_S)); }
+    }
+    prevEnd=u.e;
+  }
+}
+function mergeByS(A,B){ const out=new Array(A.length+B.length); let i=0,j=0,k=0;
+  while(i<A.length||j<B.length){ if(j>=B.length || (i<A.length && (A[i].s<B[j].s || (A[i].s===B[j].s && A[i].e<=B[j].e)))) out[k++]=A[i++]; else out[k++]=B[j++]; } return out; }
+function derive(s, Q, isLive){
+  const eng=s.eng, now=eng.i*s.dt, ipA=eng.ipus[0], ipC=eng.ipus[1];
+  for(const Lst of eng.ipus) for(const ip of Lst){ ip.chars=0; ip.claimed=false; ip.lex=false; ip.bc=false; }
+  associate(ipA,s.finals[0],Q,now,isLive); associate(ipC,s.finals[1],Q,now,isLive);
+  const fC=s.finals[1]; let nDup=0;
+  for(const u of s.finals[0]){ u.dup=false; if(!u.est||u.pending) continue; const bu=bigr(u.norm);
+    for(let i=lbT(fC,u.t-K.DEDUP_WIN_S); i<fC.length && fC[i].t<=u.t+K.DEDUP_WIN_S; i++){ if(jac(bu,bigr(fC[i].norm))>=Q.dedupJ){ u.dup=true; nDup++; break; } } }
+  for(const Lu of s.finals) for(const u of Lu){ if(u.dup||u.est) continue; let D=0; for(const ip of u.ipus) D+=ip.e-ip.s;
+    for(const ip of u.ipus){ ip.chars+=u.chars*(ip.e-ip.s)/D; ip.claimed=true; if(!u.aiz) ip.lex=true; } }
+  const all=mergeByS(ipA,ipC);
+  // turns with lexical + timing backchannel rule
+  const turns=[]; let cur=null;
+  for(let i=0;i<all.length;i++){ const ip=all[i];
+    if(!cur){ cur={spk:ip.ch,s:ip.s,e:ip.e,phon:ip.e-ip.s}; turns.push(cur); continue; }
+    if(ip.ch===cur.spk){ if(ip.e>cur.e) cur.e=ip.e; cur.phon+=ip.e-ip.s; continue; }
+    if((ip.e-ip.s)*1000<Q.bcMax && !ip.lex){ const nx=all[i+1];
+      if(ip.e<=cur.e || (nx && nx.ch===cur.spk && nx.s<=ip.e+K.BC_RESUME_S)){ ip.bc=true; continue; } }
+    cur={spk:ip.ch,s:ip.s,e:ip.e,phon:ip.e-ip.s}; turns.push(cur);
+  }
+  for(let k=1;k<turns.length;k++){ const v=turns[k].s-turns[k-1].e; turns[k].fto=v; turns[k].intr = v < -Q.intrMs/1000; }
+  // union -> silences ; intersection -> overlaps
+  const sil=[], ovl=[]; let ue=-1, first=true;
+  for(const ip of all){ if(first){ ue=ip.e; first=false; continue; } if(ip.s>ue){ if(ip.s-ue>=Q.deadAir) sil.push({s:ue,e:ip.s}); ue=ip.e; } else if(ip.e>ue) ue=ip.e; }
+  let liveSil=null; if(isLive && !first && !eng.act[0] && !eng.act[1] && now-ue>=Q.deadAir){ liveSil={s:ue,e:now}; }
+  { let i=0,j=0; while(i<ipA.length&&j<ipC.length){ const a=ipA[i], c=ipC[j], s0=Math.max(a.s,c.s), e0=Math.min(a.e,c.e); if(e0>s0) ovl.push({s:s0,e:e0}); if(a.e<c.e) i++; else j++; } }
+  const utts=[...s.finals[0], ...s.finals[1]].sort((a,b)=>a.s-b.s||a.ch-b.ch||a.n-b.n);
+  let phA=0, phAc=0; for(const ip of ipA){ if(ip.bc) continue; phA+=ip.e-ip.s; if(ip.claimed) phAc+=ip.e-ip.s; }
+  let phC=0, phCc=0; for(const ip of ipC){ if(ip.bc) continue; phC+=ip.e-ip.s; if(ip.claimed) phCc+=ip.e-ip.s; }
+  return { now, utts, turns, sil, liveSil, ovl, nDup, covA: phA?phAc/phA:NaN, covC: phC?phCc/phC:NaN,
+    estA: s.finals[0].filter(u=>u.est&&!u.dup&&!u.pending).length, estC: s.finals[1].filter(u=>u.est&&!u.pending).length };
+}
+function kpis(s, Dv, a, b){
+  const eng=s.eng, ipA=eng.ipus[0], ipC=eng.ipus[1], clip=(x,y)=>Math.max(0,Math.min(y,b)-Math.max(x,a));
+  const talk=Lst=>{ let x=0; for(let i=lbE(Lst,a); i<Lst.length && Lst[i].s<b; i++) x+=clip(Lst[i].s,Lst[i].e); return x; };
+  const rate=Lst=>{ let c=0,d=0; for(let i=lbE(Lst,a); i<Lst.length && Lst[i].s<b; i++){ const ip=Lst[i]; if(ip.claimed && ip.s>=a){ c+=ip.chars; d+=ip.e-ip.s; } } return d>0?c/d*60:NaN; };
+  const sils=[...Dv.sil, ...(Dv.liveSil?[Dv.liveSil]:[])]; let silN=0, silT=0, silMax=0;
+  for(const x of sils){ const c=clip(x.s,x.e); if(c>0){ silT+=c; if(x.s>=a) silN++; silMax=Math.max(silMax,x.e-x.s); } }
+  let ovT=0; for(let i=lbE(Dv.ovl,a); i<Dv.ovl.length && Dv.ovl[i].s<b; i++) ovT+=clip(Dv.ovl[i].s,Dv.ovl[i].e);
+  const ftoA=[]; let intrA=0, intrC=0, monoA=0;
+  for(let k=lbS(Dv.turns,a); k<Dv.turns.length && Dv.turns[k].s<b; k++){ const t=Dv.turns[k];
+    if(k>0 && t.spk===0 && Dv.turns[k-1].spk===1) ftoA.push(t.fto*1000);
+    if(t.intr){ if(t.spk===0) intrA++; else intrC++; }
+  }
+  { let rs=null, re=0; for(let i=lbE(ipA,a); i<ipA.length && ipA[i].s<b; i++){ const ip=ipA[i]; if(ip.bc||ip.s<a) continue;
+      if(rs!==null){ let brk=ip.s-re>=P.deadAir; if(!brk) for(let k=lbS(ipC,re); k<ipC.length && ipC[k].s<ip.s; k++) if(!ipC[k].bc){ brk=true; break; } if(brk){ monoA=Math.max(monoA,re-rs); rs=null; } }
+      if(rs===null){ rs=ip.s; re=ip.e; } else re=Math.max(re,ip.e); }
+    if(rs!==null) monoA=Math.max(monoA,re-rs); }
+  let bcA=0; for(let i=lbE(ipA,a); i<ipA.length && ipA[i].s<b; i++) if(ipA[i].bc && ipA[i].s>=a) bcA++;
+  let filA=0; for(const u of s.finals[0]) if(!u.dup && u.s>=a && u.s<b) filA+=u.fil;
+  const tA=talk(ipA), tC=talk(ipC), span=Math.max(0,Math.min(b,Dv.now)-a);
+  return { span, tA, tC, share: tA+tC>0?tA/(tA+tC):NaN, rateA:rate(ipA), rateC:rate(ipC), ftoMed: ftoA.length?median(ftoA):NaN, ftoN:ftoA.length,
+    silN, silT, silMax, silRatio: span>0?silT/span:NaN, ovRatio: tA+tC-ovT>0?ovT/(tA+tC-ovT):NaN, intrA, intrC,
+    bcPerMin: tC>0?bcA/(tC/60):NaN, filPerMin: tA>0?filA/(tA/60):NaN, monoA };
+}
+function kwTable(s){ const t=KW.map(()=>[0,0]); for(const Lu of s.finals) for(const u of Lu){ if(u.dup||!u.kw) continue; for(const k in u.kw) if(t[k]) t[k][u.ch]+=u.kw[k]; } return t; }
+
+// ---------- hashing / serialization ----------
+function canon(o){
+  if(Array.isArray(o)) return '['+o.map(canon).join(',')+']';
+  if(o && typeof o==='object') return '{'+Object.keys(o).sort().map(k=>JSON.stringify(k)+':'+canon(o[k])).join(',')+'}';
+  if(typeof o==='number') return Number.isFinite(o)? JSON.stringify(+o.toPrecision(K.SIGFIG)) : 'null';
+  return JSON.stringify(o===undefined?null:o);
+}
+const enc = new TextEncoder();
+async function sha(bytes){ if(!crypto?.subtle) return 'unavailable'; const h=await crypto.subtle.digest('SHA-256',bytes); return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
+function i16le(a){ const u=new Uint8Array(a.length*2), dv=new DataView(u.buffer); for(let i=0;i<a.length;i++) dv.setInt16(i*2,a[i],true); return u; }
+function b64(u8){ let s=''; for(let i=0;i<u8.length;i+=0x8000) s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000)); return btoa(s); }
+function unb64i16(str){ const bin=atob(str), n=bin.length>>1, out=new Int16Array(n); for(let i=0;i<n;i++){ const v=bin.charCodeAt(2*i)|(bin.charCodeAt(2*i+1)<<8); out[i]=v>32767?v-65536:v; } return out; }
+const finalsPlain = s => [...s.finals[0],...s.finals[1]].sort((a,b)=>a.n-b.n).map(u=>({n:u.n,ch:u.ch,t:u.t,text:u.text,conf:u.conf}));
+async function* chunksOf(s){ const B=40; for(let k=0;k<s.store.n;k+=B){ const rows=await s.store.batch(k,k+B-1); for(const r of rows) yield r; } }
+function summary(s){ const c=kpis(s,DV,0,DV.now); return { kpi:c, counts:{ipuA:s.eng.ipus[0].length, ipuC:s.eng.ipus[1].length, turns:DV.turns.length, finals:s.nFin, dup:DV.nDup, sil:DV.sil.length} }; }
+async function computeHashes(s){
+  const parts=[]; let n=0; for await (const r of chunksOf(s)){ const a=i16le(r.a), b=i16le(r.b); parts.push(a,b); n+=a.length+b.length; }
+  const c=enc.encode(canon({dt:s.dt, finals:finalsPlain(s)})); const all=new Uint8Array(n+c.length); let o=0; for(const p of parts){ all.set(p,o); o+=p.length; } all.set(c,o);
+  return { input: await sha(all), params: await sha(enc.encode(canon({v:APP_VERSION, K, P0:s.P0, log:s.log, post:postParams()}))), result: await sha(enc.encode(canon(summary(s)))) };
+}
+
+// ---------- UI state ----------
+let tab='kpi', dirty=true, deriveTimer=null, clockMode='el', lastMini=0;
+const view={t0:0,t1:180,follow:true};
+const names = () => [$('#i_nA').value.trim()||'自分', $('#i_nC').value.trim()||'相手'];
+function applyNames(){ const [a,c]=names(); $('#mLblA').textContent=a; $('#mLblC').textContent=c; document.querySelectorAll('.nA').forEach(e=>e.textContent=a); document.querySelectorAll('.nC').forEach(e=>e.textContent=c); dirty=true; if(DV){ VL.render(); renderPanel(); } }
+$('#i_nA').oninput=applyNames; $('#i_nC').oninput=applyNames;
+function setStatus(kind,tx){ $('#dot').className='dot'+(kind==='rec'?' rec':kind==='ok'?' ok':''); $('#statusTx').textContent=tx; }
+let deriveMs=NaN;
+function refresh(){ if(!S) return; const t0=performance.now(); DV=derive(S,postParams(),!!L); deriveMs=performance.now()-t0; S.dirty=false; VL.setRows(DV.utts); renderPanel(); dirty=true;
+  const n=DV.utts.filter(u=>!u.dup).length; $('#txCount').textContent=`${n.toLocaleString()} 発話`; }
+function scheduleRefresh(ms=150){ clearTimeout(deriveTimer); deriveTimer=setTimeout(refresh,ms); }
+
+// ---------- sidebar ----------
+function buildParams(list, box, onChange){
+  for(const p of list){
+    const d=document.createElement('div'); d.className='prm'; d.title=p.help;
+    d.innerHTML=`<label for="n_${p.k}">${p.label}${p.unit?` <span class="u">${p.unit}</span>`:''}</label><input type="number" id="n_${p.k}" min="${p.min}" max="${p.max}" step="${p.step}" value="${p.def}"><input type="range" min="${p.min}" max="${p.max}" step="${p.step}" value="${p.def}" aria-label="${p.label}">`;
+    box.appendChild(d);
+    const num=d.querySelector('input[type=number]'), rng=d.querySelector('input[type=range]');
+    const set=(v,src,silent)=>{ v=Number(v); if(!Number.isFinite(v)) return; v=Math.min(p.max,Math.max(p.min,v)); P[p.k]=v; if(src!==num) num.value=v; if(src!==rng) rng.value=v; if(!silent) onChange(p.k,v); };
+    num.addEventListener('change',()=>set(num.value,num)); rng.addEventListener('input',()=>set(rng.value,rng)); p._set=set;
+  }
+}
+let rerunTimer=null;
+function onVadChange(k,v){
+  if(k==='thOn' && P.thOff>v) VADP[1]._set(v,null,true); if(k==='thOff' && P.thOn<v) VADP[0]._set(v,null,true);
+  if(!S) return;
+  if(L){ const f=S.eng.i; const last=S.log[S.log.length-1]; if(last && last.f===f) Object.assign(last.p,vadParams()); else S.log.push({f, p:vadParams()}); saveRec(S,'recording'); toast(`区間検出パラメータを ${fmtH(f*S.dt)} 以降に適用（履歴に記録）`); return; }
+  clearTimeout(rerunTimer); rerunTimer=setTimeout(async()=>{ S.P0=vadParams(); S.log=[]; await rerun(S); saveRec(S); refresh(); finalizeHashes(); },350);
+}
+buildParams(VADP,$('#g_vad'),onVadChange);
+buildParams(POSTP,$('#g_post'),()=>{ if(S){ scheduleRefresh(80); if(!L) finalizeHashes(true); } });
+$('#kw').addEventListener('input',()=>{ parseKW(); if(S){ for(const Lu of S.finals) for(const u of Lu) u.kw=kwHits(u.norm); scheduleRefresh(200); } });
+parseKW();
+$('#btnReset').onclick=()=>{ VADP.forEach(p=>p._set(p.def,null,true)); POSTP.forEach(p=>p._set(p.def,null,true)); onVadChange('reset',0); if(S) scheduleRefresh(); toast('既定値に戻しました'); };
+$('#btnCopyP').onclick=async()=>{ const s=JSON.stringify({app_version:APP_VERSION, vad:vadParams(), post:postParams(), constants:K, log:S?.log||[]},null,2);
+  try{ await navigator.clipboard.writeText(s); toast('パラメータ JSON を複製しました'); }catch{ toast('クリップボードを使えない環境です。セッション JSON に同じ内容が含まれます'); } };
+$('#i_psrc').onchange=()=>{ $('#i_pdev').disabled=$('#i_psrc').value!=='device'; };
+async function refreshDevices(ask){
+  if(!navigator.mediaDevices?.enumerateDevices) return;
+  try{ if(ask){ const st=await navigator.mediaDevices.getUserMedia({audio:true}); st.getTracks().forEach(t=>t.stop()); } }catch(e){ toast('マイク権限を取得できませんでした: '+e.name); }
+  const ds=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='audioinput');
+  for(const [sel,first] of [[$('#i_mic'),'既定のマイク'],[$('#i_pdev'),'—']]){ const keep=sel.value; sel.innerHTML='';
+    const o=document.createElement('option'); o.value=''; o.textContent=first; sel.appendChild(o);
+    ds.forEach((d,i)=>{ if(!d.deviceId||d.deviceId==='default') return; const x=document.createElement('option'); x.value=d.deviceId; x.textContent=d.label||('入力 '+(i+1)); sel.appendChild(x); });
+    sel.value=keep; }
+}
+$('#btnDevices').onclick=()=>refreshDevices(true);
+function lockUI(on){ ['#btnStart','#btnDemo','#btnStress'].forEach(s=>$(s).disabled=on); $('#btnStop').disabled=!L; $('#inputGroup').classList.toggle('locked',on); $('#histMenu').classList.toggle('locked',on); }
+function progress(x){ const p=$('#prog'); if(x==null){ p.hidden=true; return; } p.hidden=false; $('#progBar').style.width=(x*100).toFixed(1)+'%'; }
+
+// ---------- live capture ----------
+const SRC = window.SpeechRecognition || window.webkitSpeechRecognition;
+const trackAsrSupported = () => !!SRC && (('processLocally' in SRC.prototype) || typeof SRC.available==='function');
+const tNow = () => (L && L.p0!==null) ? L.AC.currentTime-L.p0 : (S? S.eng.i*S.dt : 0);
+
+async function startLive(){
+  if(L) return;
+  if(!window.isSecureContext){ toast('安全なコンテキスト (https / localhost) が必要です'); return; }
+  if(!navigator.mediaDevices?.getUserMedia){ toast('音声取得に未対応のブラウザです。デスクトップ版 Chrome / Edge を使ってください'); return; }
+  const I={ psrc:$('#i_psrc').value, asrP:$('#i_asrP').value, ec:$('#i_ec').checked, ns:$('#i_ns').checked, agc:$('#i_agc').checked,
+    rec:$('#i_rec').checked, wake:$('#i_wake').checked, ondev:$('#i_ondev').checked, kbps:+$('#i_kbps').value, segMin:+$('#i_seg').value, lang:'ja-JP' };
+  let mic=null, par=null;
+  try{
+    mic=await navigator.mediaDevices.getUserMedia({audio:{deviceId:$('#i_mic').value?{exact:$('#i_mic').value}:undefined, echoCancellation:I.ec, noiseSuppression:I.ns, autoGainControl:I.agc, channelCount:1}});
+    if(I.psrc==='display'){
+      if(!navigator.mediaDevices.getDisplayMedia) throw Object.assign(new Error(),{name:'NoDisplayMedia'});
+      par=await navigator.mediaDevices.getDisplayMedia({video:true, audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}, systemAudio:'include', selfBrowserSurface:'exclude', surfaceSwitching:'include'});
+      par.getVideoTracks().forEach(t=>t.enabled=false);
+      if(!par.getAudioTracks().length){ par.getTracks().forEach(t=>t.stop()); throw Object.assign(new Error(),{name:'NoAudioShared'}); }
+    } else {
+      if(!$('#i_pdev').value) throw Object.assign(new Error(),{name:'NoPartnerDevice'});
+      par=await navigator.mediaDevices.getUserMedia({audio:{deviceId:{exact:$('#i_pdev').value}, echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    }
+  }catch(e){
+    mic?.getTracks().forEach(t=>t.stop());
+    const m={NotAllowedError:'マイク・画面共有の権限が拒否されました。HTTPS または localhost で開き、権限設定を確認してください',
+      NoAudioShared:'音声が共有されていません。共有ダイアログで「タブの音声を共有」/「システム音声を共有」を ON にしてください',
+      NoPartnerDevice:'「相手用デバイス」を選んでください（例：仮想オーディオケーブル）', NoDisplayMedia:'画面共有 API が使えません。仮想入力デバイス方式にしてください',
+      NotFoundError:'入力デバイスが見つかりません', OverconstrainedError:'選択デバイスが使えません。デバイス一覧を更新してください'};
+    toast(m[e.name]||('開始できませんでした: '+e.name),8000); return;
+  }
+  const AC=new AudioContext({latencyHint:'balanced'}); await AC.resume();
+  const N=1024, meta={source:'live', fs:AC.sampleRate, N, started_at:new Date().toISOString(), startEpoch:Date.now(), inputs:I, names:names(), app_version:APP_VERSION, asr_mode:{}};
+  if(!IDB.ok && I.rec){ I.rec=false; toast('ディスク保存 (IndexedDB) が使えないため音声保存を無効化。メモリ保護のため',7000); }
+  if(navigator.storage?.persist) navigator.storage.persist().then(g=>{ if(S) S.meta.persisted=g; });
+  S=mkSession({source:'live', meta, P0:vadParams(), persistent:true}); S.status='recording'; DV=null; H=null; VL.reset(); await saveRec(S,'recording');
+  const sMic=AC.createMediaStreamSource(mic), sPar=AC.createMediaStreamSource(new MediaStream(par.getAudioTracks()));
+  const mg=AC.createChannelMerger(2); sMic.connect(mg,0,0); sPar.connect(mg,0,1);
+  const proc=AC.createScriptProcessor(N,2,2), mute=AC.createGain(); mute.gain.value=0; mg.connect(proc); proc.connect(mute); mute.connect(AC.destination);
+  L={AC, mic, par, proc, mg, I, p0:null, recs:[null,null], interim:['',''], fatal:[false,false], lastEvt:[0,0], spF:[0,0], endAt:[null,null],
+     recorder:null, dest:null, seg:-1, segT0:0, wake:null, lastSave:0, stopped:false};
+  proc.onaudioprocess=ev=>{
+    if(!L||L.stopped) return;
+    if(L.p0===null){ L.p0=ev.playbackTime; S.meta.startEpoch=Date.now(); }
+    const a=ev.inputBuffer.getChannelData(0), b=ev.inputBuffer.getChannelData(1); let sa=0,sb=0;
+    for(let i=0;i<a.length;i++){ sa+=a[i]*a[i]; sb+=b[i]*b[i]; }
+    const q0=Math.max(K.QMIN,Math.round(1000*Math.log10(sa/a.length+1e-13))), q1=Math.max(K.QMIN,Math.round(1000*Math.log10(sb/b.length+1e-13)));
+    S.eng.push(q0,q1); if(S.eng.act[0]) L.spF[0]++; if(S.eng.act[1]) L.spF[1]++;
+    if(S.eng.i % 47 === 0) housekeeping();
+  };
+  par.getAudioTracks()[0].addEventListener('ended',()=>toast('相手音声の共有が終了しました。停止して保存してください',8000));
+  if(I.rec && window.MediaRecorder){ try{ L.dest=AC.createMediaStreamDestination(); L.dest.channelCount=2; L.dest.channelCountMode='explicit'; L.dest.channelInterpretation='discrete'; mg.connect(L.dest); startSeg(); }catch(e){ toast('音声保存を開始できませんでした（文字起こしは継続）'); } }
+  const trackOK=trackAsrSupported();
+  S.meta.asr_mode={ self: trackOK?'track':'default-mic', partner: I.asrP==='off'?'off':(I.asrP==='force'||trackOK)?'track':'off', lang:'ja-JP', processLocally:false, engine: SRC?'Web Speech API':'none' };
+  if(SRC && I.ondev && typeof SRC.available==='function'){
+    try{ const st=await SRC.available({langs:['ja-JP'], processLocally:true});
+      if(st==='available') S.meta.asr_mode.processLocally=true;
+      else if((st==='downloadable'||st==='downloading') && typeof SRC.install==='function') S.meta.asr_mode.processLocally=!!(await SRC.install({langs:['ja-JP'], processLocally:true}));
+    }catch{}
+    if(!S.meta.asr_mode.processLocally) toast('端末内認識 (ja-JP) は利用不可。クラウド認識で続行します');
+  }
+  if(SRC){ startAsr(0); if(S.meta.asr_mode.partner==='track') startAsr(1); } else toast('音声認識 (Web Speech API) に未対応のブラウザです。区間検出のみ行います',7000);
+  if(SRC && !trackOK) toast('トラック指定の音声認識に未対応。自分は既定マイクで認識、相手は区間検出のみ',8000);
+  if(I.wake) acquireWake();
+  view.follow=true; view.t0=0; view.t1=180; setStatus('rec','収録中'); lockUI(true); $('#player').hidden=true;
+  L.tick=setInterval(()=>{ if(S.dirty||L) refresh(); },1000);
+  refreshDevices(false);
+}
+function housekeeping(){
+  const t=tNow(), dt=S.dt;
+  for(const ch of [0,1]){ if(L.recs[ch] && t-L.lastEvt[ch]>K.WD_IDLE_S && L.spF[ch]*dt>K.WD_SPEECH_S){ S.quality.watchdog[ch]++; L.spF[ch]=0; L.lastEvt[ch]=t; try{ L.recs[ch].abort(); }catch{} } }
+  IDB.flush();
+  if(L.recorder && t-L.segT0 >= L.I.segMin*60){ const old=L.recorder; startSeg(); try{ old.stop(); }catch{} }
+  if(t-L.lastSave>30){ L.lastSave=t; S.quality.drift=t-S.eng.i*dt; saveRec(S,'recording'); }
+  if(L.AC.state!=='running') L.AC.resume().catch(()=>{});
+}
+function startSeg(){
+  const seg=++L.seg, mime=['audio/webm;codecs=opus','audio/mp4;codecs=mp4a.40.2','audio/ogg;codecs=opus'].find(t=>MediaRecorder.isTypeSupported(t));
+  const r=new MediaRecorder(L.dest.stream, mime?{mimeType:mime, audioBitsPerSecond:L.I.kbps*1000}:{audioBitsPerSecond:L.I.kbps*1000});
+  const rec={seg, t0:tNow(), t1:null, mime:r.mimeType||mime||'application/octet-stream', bytes:0, parts:0}; S.aseg.push(rec);
+  const sid=S.sid, s=S;
+  r.onstart=()=>{ rec.t0=tNow(); IDB.enqueue('aseg',{sid,...rec}); };
+  r.ondataavailable=e=>{ if(!e.data.size) return; rec.bytes+=e.data.size; IDB.enqueue('audio',{sid, seg, part:rec.parts++, blob:e.data}); };
+  r.onstop=()=>{ rec.t1=(L&&L.p0!==null)?tNow():s.eng.i*s.dt; IDB.enqueue('aseg',{sid,...rec}); };
+  r.start(K.PART_MS); L.recorder=r; L.segT0=tNow();
+}
+function startAsr(ch){
+  if(!L || L.stopped || L.fatal[ch]) return;
+  const r=new SRC(); r.lang='ja-JP'; r.continuous=true; r.interimResults=true; r.maxAlternatives=1;
+  if(S.meta.asr_mode.processLocally && 'processLocally' in r) r.processLocally=true;
+  r.onaudiostart=()=>{ if(!L) return; if(L.endAt[ch]!==null){ S.quality.gapS[ch]+=tNow()-L.endAt[ch]; L.endAt[ch]=null; } L.lastEvt[ch]=tNow(); };
+  r.onresult=ev=>{ if(!L) return; L.lastEvt[ch]=tNow(); L.spF[ch]=0; let interim='';
+    for(let i=ev.resultIndex;i<ev.results.length;i++){ const res=ev.results[i], alt=res[0];
+      if(res.isFinal){ const text=alt.transcript.trim(); if(text) addFinal(S,ch,tNow(),text,+(alt.confidence||0).toFixed(4),true); } else interim+=alt.transcript; }
+    L.interim[ch]=interim; renderInterim(); };
+  r.onerror=ev=>{ if(['not-allowed','service-not-allowed','language-not-supported','audio-capture'].includes(ev.error)){ if(L) L.fatal[ch]=true; toast(`${names()[ch]} の音声認識エラー: ${ev.error}`,7000); } };
+  r.onend=()=>{ if(!L||L.stopped||L.fatal[ch]) return; L.endAt[ch]=tNow(); S.quality.restarts[ch]++; setTimeout(()=>startAsr(ch),150); };
+  try{ const tr=ch===0?L.mic.getAudioTracks()[0]:L.par.getAudioTracks()[0];
+    if(S.meta.asr_mode[ch?'partner':'self']==='track') r.start(tr); else r.start(); L.recs[ch]=r;
+  }catch(e){ L.fatal[ch]=true; toast(`${names()[ch]} の音声認識を開始できません: ${e.name}`,7000); }
+}
+async function acquireWake(){ try{ if(navigator.wakeLock && L){ L.wake=await navigator.wakeLock.request('screen'); } }catch{ /* permissions policy may block in frames */ } }
+document.addEventListener('visibilitychange',()=>{ if(L && L.I.wake && document.visibilityState==='visible' && (!L.wake || L.wake.released)) acquireWake(); });
+async function stopLive(){
+  if(!L) return; const l=L; l.stopped=true; clearInterval(l.tick);
+  l.recs.forEach(r=>{ try{ r&&r.abort(); }catch{} });
+  if(l.recorder && l.recorder.state!=='inactive'){ await new Promise(res=>{ const o=l.recorder, prev=o.onstop; o.onstop=()=>{ prev&&prev(); res(); }; o.stop(); }); }
+  S.quality.drift = l.p0!==null ? (l.AC.currentTime-l.p0)-S.eng.i*S.dt : null;
+  S.meta.ended_at=new Date().toISOString(); S.eng.finish(); await IDB.flush();
+  l.mic.getTracks().forEach(t=>t.stop()); l.par.getTracks().forEach(t=>t.stop()); try{ await l.AC.close(); }catch{} try{ l.wake?.release(); }catch{}
+  L=null; S.status='done'; await saveRec(S,'done');
+  $('#txInterim').innerHTML=''; lockUI(false); $('#btnFollow').hidden=true; setStatus('ok','収録済み');
+  refresh(); fitView(); finalizeHashes(); setupPlayerAvailable(); loadHistory();
+}
+$('#btnStart').onclick=startLive; $('#btnStop').onclick=stopLive;
+function renderInterim(){ const b=$('#txInterim'); b.innerHTML=''; if(!L) return; const nm=names();
+  [0,1].forEach(ch=>{ if(L.interim[ch]){ const d=document.createElement('div'); d.className='interim'; d.textContent=`${nm[ch]} 認識中… ${L.interim[ch]}`; b.appendChild(d);} }); }
+window.addEventListener('beforeunload',e=>{ IDB.flush(); if(L){ e.preventDefault(); e.returnValue=''; } });
+window.addEventListener('pagehide',()=>{ IDB.flush(); if(S&&L) saveRec(S,'recording'); });
+
+// ---------- offline rerun (streams frames from disk in batches) ----------
+async function rerun(s){
+  const eng=new Engine(s.dt, s.P0, s.log); eng.onChunk=null; let k=0; progress(0);
+  const total=Math.max(1,s.store.n);
+  for await (const r of chunksOf(s)){ if(r.k!==k) break; const a=r.a, b=r.b; for(let i=0;i<a.length;i++) eng.push(a[i],b[i]); k++; if(k%40===0){ progress(k/total); await tick(); } }
+  eng.finish(); s.eng=eng; progress(null);
+}
+async function finalizeHashes(silent){ if(!S||L) return; const s=S; s.hashes=null; if(tab==='repro') renderPanel(); const h=await computeHashes(s); if(S===s){ s.hashes=h; if(tab==='repro') renderPanel(); } return h; }
+
+// ---------- synthetic calls (demo + 9h stress). Same engine path as live ----------
+const DEMO=[
+  [0,"お疲れさまです。|本日の打ち合わせを|始めます。"],
+  [1,"よろしくお願いします。|まず、|進捗を|共有します。"],
+  [0,"ありがとうございます。|現在の状況から|教えてください。",{bc:2}],
+  [1,"前回から|作業を進めています。|主要な確認事項は|整理できました。"],
+  [0,"承知しました。|資料を確認しますので、|少しお待ちください。",{hold:9}],
+  [0,"お待たせしました。|次の工程について|説明してもらえますか。"],
+  [1,"はい。|まず、|関連する資料を|更新します。"],
+  [0,"ありがとうございます。|予定についても|確認したいです。"],
+  [1,"えーと、|来週の前半に|初稿を共有する予定です。|気になる点は|そのときに相談します。",{bc:2}],
+  [0,"なるほど。|共有後に|確認の時間を取りましょう。",{gap:-0.4}],
+  [1,"はい、|それでお願いします。"],
+  [0,"では、|担当する項目を|それぞれ整理しましょう。"],
+  [1,"わかりました。|少し確認します。",{hold:6}],
+  [1,"確認できました。|こちらの作業は|進められそうです。",{leak:true}],
+  [0,"ありがとうございます。|必要な情報があれば|共有してください。"],
+  [1,"了解です。|進捗があれば|連絡します。"],
+  [0,"他に|確認事項は|ありますか。"],
+  [1,"いまのところ|大丈夫です。|ありがとうございました。"],
+  [0,"では、|本日の打ち合わせは|以上です。"],
+];
+const A_POOL=[
+  ["本日の打ち合わせを|始めます。"],
+  ["現在の進捗について|共有してください。"],
+  ["確認しますので、|少しお待ちください。",1],
+  ["ありがとうございます。|作業の予定に|変更はありますか。"],
+  ["承知しました。|一度整理して|進めましょう。"],
+  ["では、|次の確認事項を|共有します。"],
+  ["他に|確認したい点は|ありますか。"],
+  ["念のため、|担当する項目を|整理しましょう。"],
+  ["その件は、|共有資料の|後半にあります。"],
+  ["本日は|ありがとうございました。|引き続きお願いします。"],
+];
+const C_POOL=[
+  "よろしくお願いします。|進捗を|共有します。",
+  "まず、|資料の|更新が終わりました。",
+  "えーと、|次の作業は|確認中です。",
+  "はい、|予定どおりです。",
+  "そうですね。|いつ頃|確認できますか。",
+  "わかりました。|ありがとうございます。",
+  "あ、|もう一つ|確認したいことがあります。",
+  "今週中に|初稿を|共有します。",
+  "少し|待ってください。|メモします。",
+];
+function makeGen(seed, script, targetS){
+  const r=mulberry32(seed), U=(a,b)=>a+(b-a)*r(), iv=[[],[]], pi=[0,0], fins=[], lastEnd=[-1,-1]; let t=1.5, si=0, prev=null, done=false;
+  function nextItem(){
+    if(script) return si<script.length?script[si++]:null;
+    if(t>targetS-30) return null;
+    const spk=prev===0?1:0;
+    if(spk===0){ const it=A_POOL[Math.floor(r()*A_POOL.length)], o={}; if(it[1]) o.hold=U(8,40); if(r()<0.3) o.bc=1; return [0,it[0],o]; }
+    const o={}; if(r()<0.06) o.gap=-U(0.4,0.9); if(r()<0.03) o.leak=true; return [1,C_POOL[Math.floor(r()*C_POOL.length)],o];
+  }
+  function plan(){ const it=nextItem(); if(!it){ done=true; return; } const [spk,text,o={}]=it;
+    if(prev!==null) t += (o.gap!==undefined)?o.gap:(spk===0?0.25+Math.abs(gauss(r))*0.45:0.2+Math.abs(gauss(r))*0.35);
+    t=Math.max(t,lastEnd[spk]+0.2);
+    const chunks=text.split('|').map(x=>x.trim()).filter(Boolean), rate=(spk===0?7.4:6.6)*U(0.9,1.1); let group=[];
+    chunks.forEach((c,k)=>{ const d=Math.max(0.3,normJ(c).length/rate); iv[spk].push({s:t,e:t+d}); t+=d; lastEnd[spk]=t; group.push(c);
+      const last=k===chunks.length-1; let pause=last?0:U(0.25,0.9);
+      if(o.bc===k+1 && !last){ pause=Math.max(pause,0.95); const bs=Math.max(t+0.15,lastEnd[1-spk]+0.2); iv[1-spk].push({s:bs,e:bs+0.35}); lastEnd[1-spk]=bs+0.35; fins.push({ch:1-spk,t:bs+1.0,text:'はい',conf:0.7}); }
+      if(last||pause>=0.75){ let txt=group.join(''); if(spk===1) txt=txt.replace(/(えーと、|あの、)/g,m=>r()<0.5?'':m); if(txt) fins.push({ch:spk,t:t+U(0.45,0.9),text:txt,conf:+U(0.8,0.95).toFixed(3)}); group=[]; }
+      t+=pause; });
+    if(o.leak && spk===1) fins.push({ch:0,t:t+0.3,text:text.replace(/\|/g,''),conf:0.6});
+    if(o.hold) t+=o.hold; prev=spk;
+  }
+  const LEV=[-27,-21], ps=(...x)=>10*Math.log10(x.reduce((a,v)=>a+Math.pow(10,v/10),0));
+  return {
+    get done(){ return done && !fins.length; }, get end(){ return t+2; },
+    fill(i0,n,dt,A,B,out){
+      const tEnd=(i0+n)*dt; while(!done && t<tEnd+30) plan();
+      for(let i=0;i<n;i++){ const tt=(i0+i)*dt, sg=[-200,-200];
+        for(let ch=0;ch<2;ch++){ const Lst=iv[ch]; let p=pi[ch]; while(p<Lst.length && Lst[p].e<tt) p++; pi[ch]=p;
+          if(p<Lst.length && Lst[p].s<=tt){ const x=Lst[p], ramp=Math.max(0,Math.min(1,(tt-x.s)/0.03,(x.e-tt)/0.03)); sg[ch]=LEV[ch]+5*Math.sin(2*Math.PI*4.2*tt+ch)+gauss(r)*1.5-(1-ramp)*30; } }
+        A[i]=Math.max(K.QMIN,Math.round(100*ps(-60+gauss(r)*1.0, sg[0], sg[1]-24))); B[i]=Math.max(K.QMIN,Math.round(100*ps(-72+gauss(r)*0.6, sg[1]))); }
+      for(let ch=0;ch<2;ch++) if(pi[ch]>2000){ iv[ch].splice(0,pi[ch]); pi[ch]=0; }
+      fins.sort((a,b)=>a.t-b.t); let m=0; while(m<fins.length && fins[m].t<tEnd) m++; out.push(...fins.splice(0,m));
+    } };
+}
+async function runSynthetic(kind){
+  if(L) return; const stress=kind==='stress';
+  const fs=48000, N=1024, dt=N/fs, target=stress?9*3600:0;
+  const meta={source: stress?'stress (synthetic 9h, seed=11)':'demo (synthetic, seed=7)', fs, N, started_at:'synthetic', startEpoch:Date.UTC(2026,0,5,0,0,0), names:names(), app_version:APP_VERSION,
+    asr_mode:{self:'synthetic',partner:'synthetic'}, note:'合成: 相手音声の −24 dB 漏れ込み、ASR のフィラー欠落 (p=0.5)、漏れ重複、相槌、保留による沈黙、割り込みを含む'};
+  lockUI(true); $('#btnStop').disabled=true; setStatus('ok', stress?'負荷試験中…':'デモ生成中…');
+  if(stress){ try{ if(window.gc) window.gc(); }catch{} }
+  const h0=heapMB(), w0=performance.now();
+  S=mkSession({source:stress?'stress':'demo', meta, P0:vadParams(), persistent:true}); S.status='recording'; DV=null; H=null; VL.reset(); $('#player').hidden=true;
+  await saveRec(S,'recording');
+  const gen=makeGen(stress?11:7, stress?null:DEMO, target), CF=S.eng.CF, A=new Int16Array(CF), B=new Int16Array(CF), out=[];
+  let i0=0, peak=h0, lastUI=0;
+  while(!gen.done || i0*dt<gen.end){
+    const n=Math.min(CF, Math.ceil(gen.end/dt)-i0); if(n<=0) break;
+    gen.fill(i0,n,dt,A,B,out);
+    for(let i=0;i<n;i++) S.eng.push(A[i],B[i]);
+    for(const f of out) addFinal(S,f.ch,f.t,f.text,f.conf,true); out.length=0;
+    i0+=n; if(Math.round(i0/CF)%40===0) await IDB.flush();
+    if(stress && i0*dt-lastUI>600){ lastUI=i0*dt; progress(Math.min(1,i0*dt/target)); $('#clock').textContent=fmtH(i0*dt); peak=Math.max(peak,heapMB()); if(Math.floor(lastUI)%3600<600){ refresh(); } await tick(); }
+    if(!stress && i0%(CF*8)===0) await tick();
+  }
+  S.eng.finish(); await IDB.flush(); S.status='done'; await saveRec(S,'done');
+  refresh(); fitView(); progress(null); lockUI(false); $('#btnStop').disabled=true;
+  const w1=performance.now(), h1=heapMB(); peak=Math.max(peak,h1);
+  S.meta.stress = stress ? { wall_s:(w1-w0)/1000, heap_before_MB:h0, heap_after_MB:h1, heap_peak_MB:peak, frames:S.eng.i, finals:S.nFin, ipus:S.eng.ipus[0].length+S.eng.ipus[1].length, dom_rows:VL.rendered } : undefined;
+  saveRec(S,'done');
+  setStatus('ok', stress?'負荷試験 完了':'デモ（合成データ）'); $('#clock').textContent=fmtH(S.eng.i*S.dt);
+  if(stress){ tab='mem'; syncTabs(); renderPanel(); toast(`9時間分を ${((w1-w0)/1000).toFixed(1)} s で処理。ヒープ ${Number.isFinite(h1)?h1.toFixed(0)+' MB':'計測不可'}、DOM 行 ${VL.rendered}`,8000); }
+  else toast('デモ通話を読み込みました。右のパラメータを変えると指標が即時再計算されます');
+  finalizeHashes(); loadHistory();
+}
+$('#btnDemo').onclick=()=>runSynthetic('demo');
+$('#btnStress').onclick=()=>runSynthetic('stress');
+
+// ---------- history / restore ----------
+async function loadHistory(){
+  const box=$('#histList'); if(!IDB.ok){ box.innerHTML='<p class="empty" style="padding:8px 12px">ディスク保存が使えない環境です。</p>'; return; }
+  const all=(await IDB.all('sessions')).sort((a,b)=>b.updated.localeCompare(a.updated));
+  if(!all.length){ box.innerHTML='<p class="empty" style="padding:8px 12px">保存済みセッションはありません。</p>'; return; }
+  box.innerHTML=all.map(r=>`<div class="hist"><div>${esc(r.meta?.started_at==='synthetic'?r.source:new Date(r.meta.started_at).toLocaleString('ja-JP'))}<small>${fmtH(r.dur)}、${(r.nFin||0).toLocaleString()} 発話、${r.status==='recording'?'<b style="color:var(--warn)">中断（復元可）</b>':'完了'}</small></div><button data-open="${esc(r.sid)}">開く</button><button data-del="${esc(r.sid)}">削除</button></div>`).join('');
+  box.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{ $('#histMenu').open=false; openStored(all.find(r=>r.sid===b.dataset.open)); });
+  box.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{ const sid=b.dataset.del; if(S?.sid===sid && L) return; await deleteSession(sid); if(S?.sid===sid){ S=null; DV=null; VL.reset(); renderPanel(); dirty=true; } loadHistory(); toast('削除しました'); });
+}
+async function deleteSession(sid){ await Promise.all([IDB.delRange('frames',[sid,-Infinity],[sid,Infinity]), IDB.delRange('finals',[sid,-Infinity],[sid,Infinity]),
+  IDB.delRange('audio',[sid,-Infinity,-Infinity],[sid,Infinity,Infinity]), IDB.delRange('aseg',[sid,-Infinity],[sid,Infinity]), IDB.delRange('sessions',sid,sid)]); }
+async function openStored(rec){
+  if(L||!rec) return; lockUI(true); setStatus('ok','復元中…');
+  S=mkSession({sid:rec.sid, source:rec.source, meta:rec.meta, P0:rec.P0, log:rec.log, persistent:true}); S.quality=rec.quality||S.quality; DV=null; VL.reset();
+  const kmax=await IDB.range('frames',[rec.sid,-Infinity],[rec.sid,Infinity]).then(x=>x.length); S.store.n=kmax;
+  const fins=await IDB.range('finals',[rec.sid,-Infinity],[rec.sid,Infinity]); fins.sort((a,b)=>a.n-b.n);
+  for(const f of fins) addFinal(S,f.ch,f.t,f.text,f.conf,false);
+  S.aseg=(await IDB.range('aseg',[rec.sid,-Infinity],[rec.sid,Infinity])).map(x=>({...x}));
+  if(rec.post) POSTP.forEach(p=>{ if(rec.post[p.k]!==undefined) p._set(rec.post[p.k],null,true); });
+  if(rec.keywords!=null){ $('#kw').value=rec.keywords; parseKW(); for(const Lu of S.finals) for(const u of Lu) u.kw=kwHits(u.norm); }
+  VADP.forEach(p=>{ if(rec.P0[p.k]!==undefined) p._set(rec.P0[p.k],null,true); });
+  await rerun(S);
+  if(rec.status==='recording'){ S.status='recovered'; await saveRec(S,'recovered'); toast('中断されたセッションを復元しました（最後の最大 15 秒分の音響特徴は失われている可能性があります）',7000); }
+  lockUI(false); $('#btnStop').disabled=true; setStatus('ok','復元済み'); refresh(); fitView(); finalizeHashes(); setupPlayerAvailable(); loadHistory();
+}
+
+// ---------- export / import ----------
+/** Download a Blob or textual export using standard browser APIs. */
+async function save(name, data, mime){
+  const blob=data instanceof Blob?data:new Blob([data],{type:mime||'application/octet-stream'});
+  const link=document.createElement('a');
+  const url=URL.createObjectURL(blob);
+  link.href=url; link.download=name; document.body.appendChild(link); link.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); link.remove(); },60000);
+}
+const csvq=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+const CRC=(()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; t[n]=c>>>0; } return t; })();
+function crc32(u8){ let c=0xFFFFFFFF; for(let i=0;i<u8.length;i++) c=CRC[(c^u8[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+async function zipStore(files){ // [{name, blob}] -> Blob (STORE, no compression; < 4 GB)
+  const parts=[], cd=[]; let off=0;
+  for(const f of files){ const data=new Uint8Array(await f.blob.arrayBuffer()), crc=crc32(data), nm=enc.encode(f.name), sz=data.length;
+    const lh=new DataView(new ArrayBuffer(30)); lh.setUint32(0,0x04034b50,true); lh.setUint16(4,20,true); lh.setUint16(6,0x0800,true); lh.setUint32(14,crc,true); lh.setUint32(18,sz,true); lh.setUint32(22,sz,true); lh.setUint16(26,nm.length,true);
+    parts.push(lh.buffer,nm,f.blob);
+    const ch=new DataView(new ArrayBuffer(46)); ch.setUint32(0,0x02014b50,true); ch.setUint16(4,20,true); ch.setUint16(6,20,true); ch.setUint16(8,0x0800,true); ch.setUint32(16,crc,true); ch.setUint32(20,sz,true); ch.setUint32(24,sz,true); ch.setUint16(28,nm.length,true); ch.setUint32(42,off,true);
+    cd.push(ch.buffer,nm); off+=30+nm.length+sz; }
+  const cdSize=cd.reduce((a,x)=>a+(x.byteLength??x.length),0), end=new DataView(new ArrayBuffer(22));
+  end.setUint32(0,0x06054b50,true); end.setUint16(8,files.length,true); end.setUint16(10,files.length,true); end.setUint32(12,cdSize,true); end.setUint32(16,off,true);
+  return new Blob([...parts,...cd,end.buffer],{type:'application/zip'});
+}
+async function segBlob(s,rec){ const parts=await IDB.range('audio',[s.sid,rec.seg,-Infinity],[s.sid,rec.seg,Infinity]); parts.sort((a,b)=>a.part-b.part); return new Blob(parts.map(p=>p.blob),{type:rec.mime}); }
+
+const MP3_ENCODER_URL='https://cdn.jsdelivr.net/npm/@breezystack/lamejs@1.2.7/dist/lamejs.iife.js';
+let mp3EncoderLoad=null, mp3ExportBusy=false;
+/** Load the pinned, publicly available LGPL-3.0 encoder only when requested. */
+function ensureMp3Encoder(){
+  if(window.lamejs?.Mp3Encoder) return Promise.resolve(window.lamejs);
+  if(mp3EncoderLoad) return mp3EncoderLoad;
+  mp3EncoderLoad=new Promise((resolve,reject)=>{
+    const script=document.createElement('script');
+    script.src=MP3_ENCODER_URL; script.crossOrigin='anonymous';
+    script.onload=()=>window.lamejs?.Mp3Encoder?resolve(window.lamejs):reject(new Error('Encoder API unavailable'));
+    script.onerror=()=>reject(new Error('MP3 encoder could not be loaded (network or content policy)'));
+    document.head.appendChild(script);
+  }).catch(error=>{ mp3EncoderLoad=null; throw error; });
+  return mp3EncoderLoad;
+}
+/** Encode all saved stereo recording segments into one chronological MP3 file. */
+async function exportSingleMp3(session, filename){
+  if(mp3ExportBusy) return;
+  if(!session.aseg.length) return toast('保存された音声がありません。録音時に「音声を保存」を有効にしてください');
+  if(!confirm('MP3への変換時に外部のオープンソースエンコーダを読み込みます。録音音声はアップロードしませんが、読み込んだコードはこのページ内で動作します。続行しますか？')) return;
+  mp3ExportBusy=true;
+  let context=null, writer=null, finished=false;
+  const parts=[];
+  try{
+    // The file picker needs a direct user gesture; invoke it before network access.
+    if(window.showSaveFilePicker){
+      try{
+        const handle=await window.showSaveFilePicker({suggestedName:filename,types:[{description:'MP3 audio',accept:{'audio/mpeg':['.mp3']}}]});
+        writer=await handle.createWritable();
+      }catch(error){ if(error?.name==='AbortError') return; throw error; }
+    }
+    lockUI(true); setStatus('ok','MP3 変換中…'); progress(0);
+    const library=await ensureMp3Encoder();
+    const sampleRate=44100, bitRate=64, blockSize=1152*8;
+    const encoder=new library.Mp3Encoder(2,sampleRate,bitRate);
+    context=new (window.AudioContext||window.webkitAudioContext)({sampleRate});
+    let pending=[], pendingSize=0, frameCursor=0;
+    /** Write an encoded block, batching file writes while preserving order. */
+    const writeBlock=async data=>{
+      if(!data.length) return;
+      const bytes=new Uint8Array(data);
+      if(!writer){ parts.push(bytes); return; }
+      pending.push(bytes); pendingSize+=bytes.byteLength;
+      if(pendingSize>=262144){ await writer.write(new Blob(pending,{type:'audio/mpeg'})); pending=[]; pendingSize=0; }
+    };
+    /** Insert silence to retain genuine gaps between recorded audio segments. */
+    const writeSilence=async frames=>{
+      const silence=new Int16Array(blockSize);
+      for(let n=0;n<frames;n+=blockSize){
+        await writeBlock(encoder.encodeBuffer(silence.subarray(0,Math.min(blockSize,frames-n)),silence.subarray(0,Math.min(blockSize,frames-n))));
+        frameCursor+=Math.min(blockSize,frames-n);
+      }
+    };
+    const ordered=[...session.aseg].sort((a,b)=>a.seg-b.seg);
+    for(const [index,segment] of ordered.entries()){
+      const audio=await segBlob(session,segment);
+      if(!audio.size) throw new Error('保存音声の一部が見つかりません (segment '+segment.seg+')');
+      const buffer=await context.decodeAudioData(await audio.arrayBuffer());
+      const left=buffer.getChannelData(0);
+      const right=buffer.numberOfChannels>1?buffer.getChannelData(1):left;
+      // Round to a small tolerance to avoid adding gaps from recorder event jitter.
+      const target=Math.round(segment.t0*sampleRate);
+      if(target>frameCursor+Math.round(sampleRate*0.25)) await writeSilence(target-frameCursor);
+      const overlap=frameCursor>target+Math.round(sampleRate*0.25)?Math.min(left.length,frameCursor-target):0;
+      const pcmL=new Int16Array(blockSize),pcmR=new Int16Array(blockSize);
+      for(let base=overlap;base<left.length;base+=blockSize){
+        const count=Math.min(blockSize,left.length-base);
+        for(let i=0;i<count;i++){
+          const a=Math.max(-1,Math.min(1,left[base+i]));
+          const b=Math.max(-1,Math.min(1,right[base+i]));
+          pcmL[i]=a<0?a*32768:a*32767;
+          pcmR[i]=b<0?b*32768:b*32767;
+        }
+        await writeBlock(encoder.encodeBuffer(pcmL.subarray(0,count),pcmR.subarray(0,count)));
+        frameCursor+=count;
+        if(((base-overlap)/blockSize & 127)===0){
+          progress((index+(base-overlap)/Math.max(1,left.length-overlap))/ordered.length);
+          await tick();
+        }
+      }
+      progress((index+1)/ordered.length);
+      await tick();
+    }
+    await writeBlock(encoder.flush());
+    if(writer){
+      if(pendingSize) await writer.write(new Blob(pending,{type:'audio/mpeg'}));
+      await writer.close(); writer=null;
+    }else await save(filename,new Blob(parts,{type:'audio/mpeg'}),'audio/mpeg');
+    finished=true; toast('MP3 を保存しました: '+filename,6000);
+  }catch(error){
+    console.error('MP3 export failed:',error);
+    toast('MP3 に変換できませんでした: '+(error?.message||String(error)),8000);
+  }finally{
+    if(writer){ try{await writer.abort();}catch{} }
+    if(context){try{await context.close();}catch{}}
+    progress(null); lockUI(false); $('#btnStop').disabled=true;
+    setStatus('ok',finished?'MP3 保存済み':'収録済み');
+    mp3ExportBusy=false;
+  }
+}
+
+document.querySelectorAll('[data-exp]').forEach(b=>b.onclick=async()=>{
+  $('#expMenu').open=false; const k=b.dataset.exp;
+  if(k==='html') return save('dual-channel-transcriber.html', getAppHtml(), 'text/html');
+  if(k==='open') return $('#fileIn').click();
+  if(!S||!DV) return toast('先に収録するか、デモ/履歴を開いてください');
+  if(L) return toast('停止してから書き出してください');
+  const rawStamp=S.meta.started_at==='synthetic'?S.source.split(' ')[0]:String(S.meta.started_at||'session').slice(0,19).replace(/[:T]/g,'-');
+  const stamp=rawStamp.replace(/[^a-zA-Z0-9_-]/g,'-')||'session';
+  const U=DV.utts.filter(u=>!u.dup), nm=names(), ts=t=>S.meta.startEpoch?new Date(S.meta.startEpoch+t*1000).toLocaleTimeString('ja-JP',{hour12:false}):'';
+  if(k==='mp3') return exportSingleMp3(S,`audio-${stamp}.mp3`);
+  if(k==='txt') return save(`call-${stamp}.txt`, U.map(u=>`[${fmtH(u.s)}] ${nm[u.ch]}: ${u.text}`).join('\n'), 'text/plain');
+  if(k==='csv'){ const rows=['id,speaker,start_s,end_s,clock,timing,text,asr_confidence,chars'];
+    U.forEach(u=>rows.push([u.id,csvq(nm[u.ch]),u.s.toFixed(3),u.e.toFixed(3),ts(u.s),u.est?'estimated':'acoustic',csvq(u.text),u.conf,u.chars].join(',')));
+    return save(`transcript-${stamp}.csv`, '\ufeff'+rows.join('\n'), 'text/csv'); }
+  if(k==='srt') return save(`subtitles-${stamp}.srt`, U.map((u,i)=>`${i+1}\n${fmtSub(u.s,',')} --> ${fmtSub(Math.max(u.e,u.s+0.5),',')}\n${nm[u.ch]}: ${u.text}\n`).join('\n'), 'text/plain');
+  if(k==='vtt') return save(`subtitles-${stamp}.vtt`, 'WEBVTT\n\n'+U.map(u=>`${fmtSub(u.s,'.')} --> ${fmtSub(Math.max(u.e,u.s+0.5),'.')}\n<v ${nm[u.ch]}>${u.text}\n`).join('\n'), 'text/plain');
+  if(k==='kpi'){ const c=kpis(S,DV,0,DV.now), rows=['metric,value,unit']; for(const [key,v] of Object.entries(c)) rows.push(`${key},${Number.isFinite(v)?v:''},`);
+    kwTable(S).forEach((x,i)=>rows.push(`${csvq('keyword:'+KW[i])},${x[0]+x[1]},count`)); return save(`kpi-${stamp}.csv`, '\ufeff'+rows.join('\n'), 'text/csv'); }
+  if(k==='zip'){ if(!S.aseg.length) return toast('保存された音声がありません（合成データには音声なし）');
+    toast('音声を ZIP にまとめています…',20000); const files=[];
+    for(const r of S.aseg){ const ext=r.mime.includes('mp4')?'m4a':r.mime.includes('ogg')?'ogg':r.mime.includes('webm')?'webm':'bin';
+      files.push({name:`seg${String(r.seg).padStart(3,'0')}_${fmtH(r.t0).replace(/:/g,'-')}.${ext}`, blob:await segBlob(S,r)}); }
+    files.push({name:'segments.json', blob:new Blob([JSON.stringify(S.aseg.map(({seg,t0,t1,mime,bytes})=>({seg,t0,t1,mime,bytes,channels:'L=self,R=partner'})),null,1)])});
+    return save(`audio-${stamp}.zip`, await zipStore(files), 'application/zip'); }
+  if(k==='json'){ const h=S.hashes||await finalizeHashes();
+    const head={schema:SCHEMA, app_version:APP_VERSION, exported_at:new Date().toISOString(), meta:S.meta, P0:S.P0, paramLog:S.log, post:postParams(), keywords:$('#kw').value, constants:K,
+      frames:{dt:S.dt, chunkFrames:S.eng.CF, encoding:'int16le centi-dBFS base64', chunks:'__CHUNKS__'}, finals:finalsPlain(S), aseg:S.aseg, results:summary(S), hashes:h};
+    const [pre,post]=JSON.stringify(head).split('"__CHUNKS__"'), parts=[pre,'['];
+    let first=true; for await (const r of chunksOf(S)){ parts.push((first?'':',')+JSON.stringify({k:r.k, mic:b64(i16le(r.a)), partner:b64(i16le(r.b))})); first=false; }
+    parts.push(']',post); return save(`session-${stamp}.json`, new Blob(parts,{type:'application/json'}), 'application/json'); }
+});
+$('#fileIn').onchange=async e=>{ const f=e.target.files[0]; e.target.value=''; if(!f||L) return;
+  try{ const j=JSON.parse(await f.text());
+    if(j.schema!==SCHEMA || !j.meta || !Number.isFinite(j.meta.fs) || !Number.isFinite(j.meta.N)
+       || j.meta.fs<=0 || j.meta.N<=0 || !j.P0 || !j.frames || !Array.isArray(j.frames.chunks)
+       || !Array.isArray(j.finals)) throw new Error('Invalid session schema');
+    lockUI(true); setStatus('ok','読込中…');
+    S=mkSession({source:'file', meta:{...j.meta, imported_from:f.name}, P0:j.P0, log:j.paramLog||[], persistent:true}); DV=null; VL.reset();
+    for(const c of j.frames.chunks) await S.store.put(c.k, unb64i16(c.mic), unb64i16(c.partner));
+    for(const x of j.finals.sort((a,b)=>a.n-b.n)) addFinal(S,x.ch,x.t,x.text,x.conf,true);
+    await IDB.flush();
+    if(j.post) POSTP.forEach(p=>{ if(j.post[p.k]!==undefined) p._set(j.post[p.k],null,true); });
+    VADP.forEach(p=>{ if(j.P0[p.k]!==undefined) p._set(j.P0[p.k],null,true); });
+    if(j.keywords!=null){ $('#kw').value=j.keywords; parseKW(); for(const Lu of S.finals) for(const u of Lu) u.kw=kwHits(u.norm); }
+    await rerun(S); S.status='done'; await saveRec(S,'done'); lockUI(false); $('#btnStop').disabled=true; setStatus('ok','読込済み: '+f.name); refresh(); fitView();
+    const h=await finalizeHashes(); const same=h&&j.hashes&&h.input===j.hashes.input&&h.result===j.hashes.result;
+    toast(same?'再現性検証: 入力・結果ハッシュとも書き出し時と一致':'注意: ハッシュ不一致（パラメータ/バージョン差を確認）',7000); loadHistory();
+  }catch(err){ lockUI(false); toast('セッション JSON を読み込めませんでした。データ形式を確認してください'); } };
+
+// ---------- virtualized transcript (DOM rows bounded by viewport) ----------
+const VL = { box:$('#txBox'), inner:$('#txInner'), rows:[], h:new Map(), offs:new Float64Array(1024), total:0, stick:true, sel:null, rendered:0, raf:0, q:'',
+  reset(){ this.rows=[]; this.h.clear(); this.total=0; this.sel=null; this.stick=true; this.inner.replaceChildren(); this.inner.style.height='0px'; this.rendered=0; $('#txEmpty').hidden=false; },
+  est(u){ const w=Math.max(160,this.box.clientWidth-100), per=Math.max(6,Math.floor(w/14.2)); return 34+Math.ceil(Math.max(1,u.text.length)/per)*21.7; },
+  setRows(rows){ this.rows=rows; $('#txEmpty').hidden=rows.length>0; this.layout(); this.render(); },
+  layout(){ const n=this.rows.length; if(this.offs.length<n+1) this.offs=new Float64Array(Math.max(n+1,this.offs.length*2)); let y=0;
+    for(let i=0;i<n;i++){ this.offs[i]=y; const u=this.rows[i]; y+=this.h.get(u.id) ?? this.est(u); } this.offs[n]=y; this.total=y; this.inner.style.height=y+'px'; },
+  find(y){ let lo=0, hi=this.rows.length; while(lo<hi){ const m=(lo+hi)>>1; if(this.offs[m+1]<=y) lo=m+1; else hi=m; } return lo; },
+  schedule(){ if(!this.raf) this.raf=requestAnimationFrame(()=>{ this.raf=0; this.render(); }); },
+  render(){
+    const n=this.rows.length; if(this.stick) this.box.scrollTop=this.total;
+    const top=this.box.scrollTop, H=this.box.clientHeight, i0=Math.max(0,this.find(top)-6), i1=Math.min(n,this.find(top+H)+8);
+    const nm=names(), frag=document.createDocumentFragment(), els=[];
+    for(let i=i0;i<i1;i++){ const u=this.rows[i], prev=this.rows[i-1];
+      const showWho=!prev || prev.ch!==u.ch || u.s-prev.s>30;
+      const d=document.createElement('div'); d.className='utt '+(u.ch?'c':'a')+(u.dup?' dup':'')+(u.id===this.sel?' sel':''); d.dataset.id=u.id; d.style.top=this.offs[i]+'px';
+      const tm = clockMode==='cl' && S?.meta.startEpoch ? new Date(S.meta.startEpoch+u.s*1000).toLocaleTimeString('ja-JP',{hour12:false}) : fmtH(u.s);
+      d.innerHTML=`<span class="tm">${tm}</span><div>${showWho?`<span class="who">${esc(nm[u.ch])}${u.pending?'<span class="tag">確定待ち</span>':u.est&&!u.dup?'<span class="tag" title="対応する音響区間が無く確定時刻から推定">時刻推定</span>':''}${u.dup?'<span class="tag">漏れ重複・除外</span>':''}</span>`:''}<span class="tx">${hl(u.text,this.q)}</span></div>`;
+      frag.appendChild(d); els.push([i,d]); }
+    this.inner.replaceChildren(frag); this.rendered=els.length;
+    let changed=false; for(const [i,d] of els){ const u=this.rows[i], hh=d.offsetHeight, old=this.h.get(u.id); if(hh && Math.abs((old ?? this.est(u))-hh)>0.5){ this.h.set(u.id,hh); changed=true; } else if(hh && old===undefined) this.h.set(u.id,hh); }
+    if(changed){ this.layout(); for(const [i,d] of els) d.style.top=this.offs[i]+'px'; if(this.stick) this.box.scrollTop=this.total; }
+    $('#btnLatest').hidden=this.stick||!n;
+  },
+  scrollTo(i){ this.stick=false; this.box.scrollTop=Math.max(0,this.offs[i]-60); this.render(); }
+};
+function hl(text,q){ const marks=[]; const add=(k,cls)=>{ if(!k) return; let p=text.indexOf(k); while(p>=0){ marks.push([p,p+k.length,cls]); p=text.indexOf(k,p+k.length); } };
+  KW.forEach(k=>add(k,'')); if(q) add(q,'q'); if(!marks.length) return esc(text);
+  marks.sort((a,b)=>a[0]-b[0]||b[1]-a[1]); let out='', pos=0; for(const [s0,e0,c] of marks){ if(s0<pos) continue; out+=esc(text.slice(pos,s0))+`<mark${c?' class="q"':''}>`+esc(text.slice(s0,e0))+'</mark>'; pos=e0; } return out+esc(text.slice(pos)); }
+VL.box.addEventListener('scroll',()=>{ VL.stick = VL.box.scrollHeight-VL.box.scrollTop-VL.box.clientHeight < 24; VL.schedule(); });
+new ResizeObserver(()=>{ VL.h.clear(); VL.layout(); VL.schedule(); }).observe(VL.box);
+$('#btnLatest').onclick=()=>{ VL.stick=true; VL.render(); };
+VL.inner.addEventListener('click',e=>{ const d=e.target.closest('.utt'); if(d) selectUtt(d.dataset.id,false,true); });
+$('#tmEl').onclick=()=>{ clockMode='el'; $('#tmEl').setAttribute('aria-pressed','true'); $('#tmCl').setAttribute('aria-pressed','false'); VL.render(); };
+$('#tmCl').onclick=()=>{ clockMode='cl'; $('#tmCl').setAttribute('aria-pressed','true'); $('#tmEl').setAttribute('aria-pressed','false'); VL.render(); };
+let qPos=-1;
+$('#q').addEventListener('keydown',e=>{ if(e.key!=='Enter'||!DV) return; const q=$('#q').value.trim(); VL.q=q; if(!q){ $('#qInfo').textContent=''; VL.render(); return; }
+  const rows=VL.rows; let total=0; for(const u of rows) if(u.text.includes(q)) total++;
+  let found=-1; for(let k=1;k<=rows.length;k++){ const i=(qPos+k)%rows.length; if(rows[i].text.includes(q)){ found=i; break; } }
+  if(found<0){ $('#qInfo').textContent='該当なし'; VL.render(); return; }
+  qPos=found; let rank=0; for(let i=0;i<=found;i++) if(rows[i].text.includes(q)) rank++;
+  $('#qInfo').textContent=`${rank}/${total}`; VL.sel=rows[found].id; VL.scrollTo(found); centerOn(rows[found]); });
+function selectUtt(id,scroll,play){ VL.sel=id; const i=VL.rows.findIndex(u=>u.id===id); if(i<0) return; if(scroll) VL.scrollTo(i); else VL.render(); centerOn(VL.rows[i]); if(play) playAt(VL.rows[i].s); }
+function centerOn(u){ const w=view.t1-view.t0; if(u.s<view.t0||u.e>view.t1){ view.follow=false; view.t0=Math.max(0,(u.s+u.e)/2-w/2); view.t1=view.t0+w; } followBtn(); dirty=true; }
+
+// ---------- audio playback (segment loaded on demand from disk) ----------
+const player=$('#player'); let curSeg=null, curUrl=null;
+function setupPlayerAvailable(){ player.hidden=!(S && S.aseg.length && !L); }
+async function playAt(t){ if(!S||L||!S.aseg.length) return;
+  let rec=S.aseg.filter(r=>r.t0<=t).pop()||S.aseg[0];
+  if(curSeg!==rec.seg||!curUrl){ if(curUrl) URL.revokeObjectURL(curUrl); curUrl=URL.createObjectURL(await segBlob(S,rec)); curSeg=rec.seg; player.src=curUrl;
+    await new Promise(res=>{ player.onloadedmetadata=()=>{ if(player.duration===Infinity){ player.currentTime=1e101; player.ontimeupdate=()=>{ player.ontimeupdate=null; res(); }; } else res(); }; }); }
+  player.hidden=false; player.currentTime=Math.max(0,t-rec.t0-0.2); player.play().catch(()=>{}); player._t0=rec.t0; }
+
+// ---------- panels ----------
+function syncTabs(){ document.querySelectorAll('[role=tab]').forEach(x=>x.setAttribute('aria-selected',String(x.dataset.tab===tab))); }
+document.querySelectorAll('[role=tab]').forEach(b=>b.onclick=()=>{ tab=b.dataset.tab; syncTabs(); renderPanel(); });
+const f=(v,d=1)=>Number.isFinite(v)?v.toFixed(d):'–';
+const pct=v=>Number.isFinite(v)?(v*100).toFixed(1)+'%':'–';
+let memCache={est:null,at:0};
+function renderPanel(){
+  const p=$('#panel');
+  if(tab==='mem') return renderMem(p);
+  if(!S||!DV){ p.innerHTML='<p class="empty">データがありません。収録を開始するか、デモ通話を読み込んでください。</p>'; return; }
+  if(tab==='kpi') return renderKpi(p);
+  renderRepro(p);
+}
+function renderKpi(p){
+  const now=DV.now, W=P.recentMin*60, c=kpis(S,DV,0,now), r=kpis(S,DV,Math.max(0,now-W),now), nm=names(), warn=[];
+  if(DV.liveSil) warn.push(`沈黙が ${f(DV.liveSil.e-DV.liveSil.s,1)} s 続いています。`);
+  if(Number.isFinite(DV.covA) && DV.covA<0.85 && now>60) warn.push(`${nm[0]} の発声時間のうち ASR と対応付いたのは ${pct(DV.covA)}。話速は対応付いた区間のみで算出。`);
+  const gat=S.eng.gated.reduce((a,x)=>a+x.e-x.s,0); if(gat>30) warn.push(`エコーゲートで ${f(gat,0)} s を棄却。ヘッドセット使用を推奨します。`);
+  const row=(lbl,def,a,b,unit,d=1,fmt)=>`<tr><td>${lbl}${def?`<small>${def}</small>`:''}</td><td class="v">${fmt?fmt(a):f(a,d)}${unit?` <small style="display:inline">${unit}</small>`:''}</td><td class="v r">${fmt?fmt(b):f(b,d)}</td></tr>`;
+  const kw=kwTable(S);
+  p.innerHTML=(warn.length?`<div class="warnbox">${warn.map(esc).join('<br>')}</div>`:'')+
+  `<div style="font-size:11.5px;color:var(--mute)">発話時間の比率　${esc(nm[0])} ${pct(c.share)} / ${esc(nm[1])} ${pct(1-c.share)}</div>
+   <div class="share" role="img" aria-label="発話時間比率"><i style="width:${(c.share||0)*100}%;background:var(--blue)"></i><i style="flex:1;background:var(--cyan)"></i></div>
+   <table class="m"><thead><tr><th>指標</th><th>累積</th><th>直近 ${P.recentMin} 分</th></tr></thead><tbody>
+   <tr class="grp"><td colspan="3">発話量</td></tr>
+   ${row('通話時間','',c.span,r.span,'',0,fmtH)}
+   ${row(`${esc(nm[0])} 発話時間`,'',c.tA,r.tA,'',0,fmtH)}
+   ${row(`${esc(nm[1])} 発話時間`,'',c.tC,r.tC,'',0,fmtH)}
+   ${row(`${esc(nm[0])} の比率`,'自分 ÷ (自分 + 相手)',c.share*100,r.share*100,'%')}
+   <tr class="grp"><td colspan="3">話し方</td></tr>
+   ${row(`${esc(nm[0])} 話速`,'文字 ÷ 発声時間（ASR 対応区間）',c.rateA,r.rateA,'字/分',0)}
+   ${row(`${esc(nm[1])} 話速`,'',c.rateC,r.rateC,'字/分',0)}
+   ${row(`${esc(nm[0])} 最長連続発話`,`相手の発話か ${P.deadAir} s 以上の沈黙で区切る`,c.monoA,r.monoA,'s',1)}
+   ${row(`${esc(nm[0])} フィラー`,'えー/えっと/あのー 等。ASR が落とすため過小',c.filPerMin,r.filPerMin,'/分',2)}
+   ${row(`${esc(nm[0])} 相槌`,`${esc(nm[1])} の発話 1 分あたり`,c.bcPerMin,r.bcPerMin,'/分',2)}
+   <tr class="grp"><td colspan="3">やりとり</td></tr>
+   ${row('応答潜時（中央値）',`${esc(nm[1])}→${esc(nm[0])} の交替、n=${c.ftoN}`,c.ftoMed,r.ftoMed,'ms',0)}
+   ${row('沈黙',`両者無発話 ≥ ${P.deadAir} s の回数`,c.silN,r.silN,'回',0)}
+   ${row('最長沈黙','',c.silMax,r.silMax,'s',1)}
+   ${row('沈黙率','沈黙 ÷ 通話時間',c.silRatio*100,r.silRatio*100,'%')}
+   ${row('重なり率','同時発声 ÷ いずれか発声',c.ovRatio*100,r.ovRatio*100,'%')}
+   ${row(`割り込み ${esc(nm[0])}→${esc(nm[1])}`,`重なり ≥ ${P.intrMs} ms の交替`,c.intrA,r.intrA,'回',0)}
+   ${row(`割り込み ${esc(nm[1])}→${esc(nm[0])}`,'',c.intrC,r.intrC,'回',0)}
+   </tbody></table>
+   ${KW.length?`<h4>キーワード出現（累積）</h4><table class="m"><thead><tr><th>語</th><th>${esc(nm[0])}</th><th>${esc(nm[1])}</th></tr></thead><tbody>${KW.map((k,i)=>`<tr><td>${esc(k)}</td><td class="v">${kw[i][0]}</td><td class="v">${kw[i][1]}</td></tr>`).join('')}</tbody></table>`:''}
+   <p class="note">話速は「文字/分」。日本語の標準はモーラ/秒だが、ASR 出力の漢字から読みを確定できないため文字数で代用（比較は同一話者の時系列内に限る）。</p>`;
+}
+function renderMem(p){
+  const heap=heapMB(), nm=names();
+  const now=performance.now(); if(now-memCache.at>5000 && navigator.storage?.estimate){ memCache.at=now; navigator.storage.estimate().then(e=>{ memCache.est=e; if(tab==='mem') renderMem($('#panel')); }).catch(()=>{}); }
+  const est=memCache.est, eng=S?.eng, bytes=S?S.aseg.reduce((a,r)=>a+r.bytes,0):0;
+  const hours=S? (eng.i*S.dt)/3600 : 0, st=S?.meta?.stress;
+  p.innerHTML=`<h4 style="margin-top:0">いまの使用量</h4><dl class="kv">
+   <dt>JS ヒープ</dt><dd>${Number.isFinite(heap)?heap.toFixed(1)+' MB':'このブラウザでは計測不可'}</dd>
+   <dt>ディスク (IndexedDB)</dt><dd>${IDB.ok?(est?(est.usage/1048576).toFixed(1)+' MB / 上限 '+(est.quota/1073741824).toFixed(1)+' GB':'計測中'):'<b style="color:var(--warn)">利用不可（メモリのみで動作）</b>'}${S?.meta?.persisted?'（永続化許可済み）':''}</dd>
+   <dt>音響特徴</dt><dd>${S?`RAM ${S.cache.size} / ディスク ${S.store.n} チャンク（1 チャンク ${K.CHUNK_S} s、RAM は最大 ${K.CACHE_CHUNKS}）`:'–'}</dd>
+   <dt>音声</dt><dd>${S?`${S.aseg.length} 区分、${(bytes/1048576).toFixed(1)} MB（全てディスク。RAM は保持しない）`:'–'}</dd>
+   <dt>発話 / IPU</dt><dd>${S?`${S.nFin.toLocaleString()} 発話、IPU ${(eng.ipus[0].length+eng.ipus[1].length).toLocaleString()}`:'–'}</dd>
+   <dt>描画中の DOM 行</dt><dd>${VL.rendered}（全 ${VL.rows.length.toLocaleString()} 行中）</dd>
+   <dt>指標の再計算</dt><dd>${f(deriveMs,1)} ms / 回（毎秒実行）</dd>
+   <dt>書き込み失敗</dt><dd>${S?S.quality.storeFail:0}</dd></dl>
+   ${st?`<h4>9時間負荷試験の結果</h4><dl class="kv"><dt>処理時間</dt><dd>${f(st.wall_s,1)} s（実時間の ${f(32400/st.wall_s,0)} 倍速）</dd><dt>ヒープ 前→後</dt><dd>${f(st.heap_before_MB,1)} → ${f(st.heap_after_MB,1)} MB（ピーク ${f(st.heap_peak_MB,1)} MB）</dd>
+     <dt>フレーム</dt><dd>${st.frames.toLocaleString()}（2 ch）</dd><dt>発話 / IPU</dt><dd>${st.finals.toLocaleString()} / ${st.ipus.toLocaleString()}</dd><dt>DOM 行</dt><dd>${st.dom_rows}</dd></dl>`:''}
+   <h4>設計（何をどこに置くか）</h4>
+   <table class="m"><thead><tr><th>データ</th><th>9 時間の量</th><th>置き場所</th></tr></thead><tbody>
+   <tr><td>音声（32 kbps Opus, 2 ch）<small>5 秒ごとの断片をそのままディスクへ追記</small></td><td class="v">約 130 MB</td><td>ディスクのみ。RAM は 0 に近い</td></tr>
+   <tr><td>音響特徴（21 ms × 2 ch, int16）<small>${K.CHUNK_S} s チャンクで追記</small></td><td class="v">約 6 MB</td><td>ディスク。RAM は直近 ${K.CACHE_CHUNKS*K.CHUNK_S/60} 分の LRU のみ</td></tr>
+   <tr><td>ASR 確定文<small>約 1 秒ごとにまとめて追記</small></td><td class="v">数 MB</td><td>RAM + ディスク</td></tr>
+   <tr><td>発話区間 (IPU)</td><td class="v">約 2〜4 MB</td><td>RAM</td></tr>
+   <tr><td>画面の行 (DOM)</td><td class="v">一定</td><td>仮想リスト。表示範囲 ±数行のみ生成</td></tr>
+   </tbody></table>
+   <p class="note">音声と音響特徴は分割して IndexedDB に保存し、画面上の文字起こしは仮想リストで表示します。確定文・発話区間等のメモリ使用量は記録時間に応じて増えます。長時間の録音可否は端末性能、ブラウザの容量制限、スリープ状態によって異なります。録音中の強制終了では直近データが失われる場合があります。</p>
+   ${S?`<div class="bar" title="9時間に対する経過"><i style="width:${Math.min(100,hours/9*100)}%"></i></div><p class="note">経過 ${fmtH(eng.i*S.dt)} / 9:00:00</p>`:''}`;
+}
+function renderRepro(p){
+  const q=S.quality, m=S.meta, h=S.hashes, nm=names(), gat=S.eng.gated.reduce((a,x)=>a+x.e-x.s,0);
+  p.innerHTML=`<h4 style="margin-top:0">データ品質</h4><dl class="kv">
+    <dt>ASR 対応率</dt><dd>${esc(nm[0])} ${pct(DV.covA)} / ${esc(nm[1])} ${pct(DV.covC)}（発声時間ベース）</dd>
+    <dt>時刻推定の発話</dt><dd>${esc(nm[0])} ${DV.estA} / ${esc(nm[1])} ${DV.estC}</dd>
+    <dt>漏れ重複の除外</dt><dd>${DV.nDup}</dd>
+    <dt>ASR 再起動</dt><dd>${q.restarts[0]} / ${q.restarts[1]} 回、空白 ${f(q.gapS[0],1)} / ${f(q.gapS[1],1)} s、ウォッチドッグ ${q.watchdog[0]} / ${q.watchdog[1]}</dd>
+    <dt>エコーゲート棄却</dt><dd>${f(gat,1)} s</dd>
+    <dt>クロックずれ</dt><dd>${q.drift!=null?f(q.drift*1000,0)+' ms（音声時計 − フレーム計数）':'–'}</dd>
+  </dl>
+  <h4>再現性</h4><dl class="kv">
+    <dt>アプリ版</dt><dd>${APP_VERSION}（${SCHEMA}）</dd>
+    <dt>データ源</dt><dd>${esc(m.source)}</dd>
+    <dt>入力ハッシュ</dt><dd class="hash">${h?h.input:(L?'停止後に算出':'算出中…')}</dd>
+    <dt>パラメータハッシュ</dt><dd class="hash">${h?h.params:'–'}</dd>
+    <dt>結果ハッシュ</dt><dd class="hash">${h?h.result:'–'}</dd>
+    <dt>パラメータ変更履歴</dt><dd>${S.log.length?S.log.map(x=>fmtH(x.f*S.dt)).join('、'):'なし'}</dd>
+    <dt>サンプリング</dt><dd>${m.fs} Hz、${m.N} サンプル/フレーム（${f(S.dt*1000,2)} ms）、${S.eng.i.toLocaleString()} フレーム</dd>
+    <dt>ASR</dt><dd>${esc(JSON.stringify(m.asr_mode||{}))}</dd>
+    <dt>認識方式</dt><dd>${m.asr_mode?.processLocally?'端末内認識':'ブラウザ設定に依存'}</dd></dl>
+  <p class="note">音響特徴を量子化したデータとパラメータから再計算できます。ハッシュ照合はデータの整合性確認に使いますが、認識精度や通話の完全性を保証するものではありません。</p>
+  <div class="method"><h4>方法</h4>
+  <p><b>話者分離</b>　チャネル分離（自分 = マイク、相手 = タブ/システム音声）。2 ch を同一 ScriptProcessor で標本同期。</p>
+  <p><b>区間検出</b>　${m.N} サンプルごとの RMS を dBFS 化。ノイズフロア f<sub>t</sub> = min(E<sub>t</sub>, f<sub>t−1</sub>+ρΔt·c)、c = 発話中 ${K.ACTIVE_RISE} / 非発話 1。開始 E &gt; f+θ<sub>on</sub>+g、継続 E &gt; f+θ<sub>off</sub>+g、g は相手発話中のみ自分側に加わるエコーゲート。ハングオーバー後に終端を最後の超過フレームへ戻し、最小区間未満を除去、ポーズ閾値未満の間隙を結合して IPU とする。確定は間隙がポーズ閾値を超えた時点（因果的）。</p>
+  <p><b>ASR 対応付け</b>　確定結果の到着時刻 t<sub>a</sub> に対し、未割当 IPU のうち終端が [t<sub>a</sub>−${K.LOOKBACK_S} s, t<sub>a</sub>+${K.TOL_S} s] にあり直近 IPU から間隙 ≤ ${K.CHAIN_GAP_S} s で連なるものを割当。無ければ時刻推定（IPU の途中で確定した場合はその IPU 開始から、それ以外は t<sub>a</sub>−ASR 遅延、長さ = 文字数/${K.EST_CHAR_PER_S}）。文字数は IPU 長で按分。</p>
+  <p><b>漏れ重複</b>　自分側の時刻推定発話が ±${K.DEDUP_WIN_S} s 内の相手発話と文字 bigram Jaccard ≥ J なら除外。</p>
+  <p><b>ターン・相槌・割り込み</b>　IPU を開始時刻順に走査。他話者 IPU が相槌上限未満、対応語が相槌語彙（はい・ええ・なるほど 等）のみか無く、現ターンに包含されるか ${K.BC_RESUME_S} s 以内に元話者が再開すれば相槌。交替時の FTO = 次ターン開始 − 前ターン終了、FTO &lt; −割り込み閾値 を割り込みとする。</p>
+  <p><b>沈黙</b>　両話者の IPU の和集合の間隙 ≥ 沈黙判定値。</p></div>`;
+}
+
+// ---------- timeline ----------
+const cv=$('#tl'), cx=cv.getContext('2d'), mv=$('#mini'), mx=mv.getContext('2d'), miniOff=document.createElement('canvas');
+function sizeCanvas(c,ctx){ const r=c.getBoundingClientRect(), dpr=devicePixelRatio||1; c.width=Math.max(1,Math.round(r.width*dpr)); c.height=Math.max(1,Math.round(r.height*dpr)); ctx.setTransform(dpr,0,0,dpr,0,0); }
+new ResizeObserver(()=>{ sizeCanvas(cv,cx); sizeCanvas(mv,mx); lastMini=0; dirty=true; }).observe(cv);
+const LN={C:{y:22,h:46}, A:{y:74,h:46}}, LX=78;
+const durNow = () => S ? S.eng.i*S.dt : 0;
+function fitView(){ const d=Math.max(durNow(),10); view.t0=0; view.t1=d; view.follow=false; followBtn(); dirty=true; }
+function tAt(px){ const W=cv.clientWidth; return view.t0+(px-LX)/(W-LX-8)*(view.t1-view.t0); }
+function forRange(Lst,a,b,fn){ for(let i=lbE(Lst,a); i<Lst.length && Lst[i].s<=b; i++) fn(Lst[i]); }
+function drawMini(){
+  const W=mv.clientWidth, H=mv.clientHeight, dpr=devicePixelRatio||1; miniOff.width=Math.round(W*dpr); miniOff.height=Math.round(H*dpr);
+  const c=miniOff.getContext('2d'); c.setTransform(dpr,0,0,dpr,0,0); c.fillStyle='#F1F5F8'; c.fillRect(0,0,W,H);
+  if(!S) return; const D=Math.max(durNow(),10), cols=Math.max(1,Math.floor(W)), acc=[new Float32Array(cols),new Float32Array(cols)], per=D/cols;
+  for(let ch=0;ch<2;ch++) for(const ip of S.eng.ipus[ch]){ const c0=Math.min(cols-1,Math.floor(ip.s/per)), c1=Math.min(cols-1,Math.floor(ip.e/per)); for(let c=c0;c<=c1;c++){ const o=Math.min(ip.e,(c+1)*per)-Math.max(ip.s,c*per); if(o>0) acc[ch][c]+=o; } }
+  for(let i=0;i<cols;i++){ const fa=Math.min(1,acc[0][i]/per), fc=Math.min(1,acc[1][i]/per);
+    if(fc>0){ c.fillStyle='#30A3DA'; c.fillRect(i,0,1,H/2*fc+0.5); } if(fa>0){ c.fillStyle='#163E93'; c.fillRect(i,H-H/2*fa-0.5,1,H/2*fa+0.5); } }
+}
+function draw(){
+  const W=cv.clientWidth, Hh=cv.clientHeight; cx.clearRect(0,0,W,Hh);
+  if(L && view.follow){ const d=durNow(), w=Math.max(10,view.t1-view.t0); view.t1=Math.max(w,d+2); view.t0=view.t1-w; }
+  const span=view.t1-view.t0, sx=(W-LX-8)/span, X=t=>LX+(t-view.t0)*sx, [nA,nC]=names();
+  cx.textBaseline='middle';
+  for(const [key,lbl,col] of [['C',nC,'#1B7FAE'],['A',nA,'#163E93']]){ const Ln=LN[key]; cx.fillStyle='#F6F9FB'; cx.fillRect(LX,Ln.y,W-LX-8,Ln.h);
+    cx.fillStyle=col; cx.font='700 12px "Noto Sans JP",sans-serif'; cx.fillText(lbl.slice(0,6),6,Ln.y+Ln.h/2); }
+  cx.font='10.5px "Noto Sans JP",sans-serif';
+  const steps=[1,2,5,10,15,30,60,120,300,600,900,1800,3600,7200], target=span/Math.max(1,(W-LX)/90), st=steps.find(s=>s>=target)||10800;
+  cx.strokeStyle='#E3E9ED'; cx.fillStyle='#5A6772'; cx.lineWidth=1;
+  for(let t=Math.ceil(view.t0/st)*st;t<=view.t1;t+=st){ const x=Math.round(X(t))+0.5; cx.beginPath(); cx.moveTo(x,LN.C.y-4); cx.lineTo(x,LN.A.y+LN.A.h); cx.stroke(); if(x<W-50) cx.fillText(fmtH(t),x+3,9); }
+  if(S){
+    const dt=S.dt, eng=S.eng;
+    if(DV){ // silences
+      cx.fillStyle='#F3E6D2'; const sils=DV.liveSil?[...DV.sil,DV.liveSil]:DV.sil;
+      for(let i=lbE(sils,view.t0); i<sils.length && sils[i].s<=view.t1; i++){ const x=X(sils[i].s), w=(sils[i].e-sils[i].s)*sx; cx.fillRect(x,LN.C.y,w,LN.A.y+LN.A.h-LN.C.y);
+        if(w>40){ cx.fillStyle='#8A4B00'; cx.fillText(f(sils[i].e-sils[i].s,1)+' s',x+4,LN.A.y-3); cx.fillStyle='#F3E6D2'; } } }
+    if(span<=1200){ // energy traces from LRU chunk cache (lazy disk loads)
+      for(const [ch,key,col] of [[1,'C','rgba(48,163,218,.33)'],[0,'A','rgba(22,62,147,.26)']]){ const Ln=LN[key]; cx.beginPath(); let started=false;
+        for(let px=LX;px<W-8;px++){ const a=Math.max(0,Math.floor(tAt(px)/dt)), b=Math.min(eng.i,Math.max(a+1,Math.ceil(tAt(px+1)/dt))); if(a>=eng.i) break;
+          let m=-1e9; for(let i=a;i<b;i+=Math.max(1,Math.floor((b-a)/8))){ const v=eng.frameAt(ch,i,S.cache); if(v===undefined){ cacheLoad(S,Math.floor(i/eng.CF)); continue; } if(v!==null && v>m) m=v; }
+          if(m===-1e9){ if(started){ cx.lineTo(px,Ln.y+Ln.h); } continue; }
+          const y=Ln.y+Ln.h-Math.max(0,Math.min(1,(m/100+80)/70))*Ln.h; if(!started){ cx.moveTo(px,Ln.y+Ln.h); started=true; } cx.lineTo(px,y); }
+        if(started){ cx.lineTo(W-8,Ln.y+Ln.h); cx.closePath(); cx.fillStyle=col; cx.fill(); } } }
+    cx.fillStyle='#AEB8C0'; forRange(eng.gated,view.t0,view.t1,g=>cx.fillRect(X(g.s),LN.A.y+LN.A.h-5,Math.max(1,(g.e-g.s)*sx),5));
+    for(const [ch,key,col] of [[1,'C','#30A3DA'],[0,'A','#163E93']]){ const Ln=LN[key];
+      forRange(eng.ipus[ch],view.t0,view.t1,ip=>{ const x=X(ip.s), w=Math.max(1.5,(ip.e-ip.s)*sx);
+        if(ip.bc){ cx.strokeStyle=col; cx.lineWidth=1.5; cx.strokeRect(x+0.5,Ln.y+14.5,w-1,Ln.h-29); } else { cx.fillStyle=col; cx.fillRect(x,Ln.y+11,w,Ln.h-22); } });
+      if(L){ const pv=eng.v[ch].provisional(); if(pv && pv.e>=view.t0){ cx.fillStyle=col; cx.globalAlpha=.45; cx.fillRect(X(pv.s),Ln.y+11,Math.max(2,(pv.e-pv.s)*sx),Ln.h-22); cx.globalAlpha=1; } } }
+    if(DV){ cx.fillStyle='#8A4B00'; if(span<=3600) for(let k=lbS(DV.turns,view.t0); k<DV.turns.length && DV.turns[k].s<=view.t1; k++){ const t=DV.turns[k]; if(!t.intr) continue; const x=X(t.s), y=(t.spk?LN.C.y:LN.A.y)+6;
+        cx.beginPath(); cx.moveTo(x,y); cx.lineTo(x+6,y-5); cx.lineTo(x+6,y+5); cx.closePath(); cx.fill(); }
+      if(VL.sel){ const u=VL.rows.find(r=>r.id===VL.sel); if(u && u.e>=view.t0 && u.s<=view.t1){ const Ln=u.ch?LN.C:LN.A; cx.strokeStyle='#051C2A'; cx.lineWidth=2; cx.strokeRect(X(u.s)-1,Ln.y+4,Math.max(3,(u.e-u.s)*sx)+2,Ln.h-8); } } }
+    let ph=null; if(L) ph=durNow(); else if(!player.hidden && !player.paused && player._t0!=null) ph=player.currentTime+player._t0;
+    if(ph!==null && ph>=view.t0 && ph<=view.t1){ const x=Math.round(X(ph))+0.5; cx.strokeStyle='#051C2A'; cx.lineWidth=1.5; cx.beginPath(); cx.moveTo(x,LN.C.y-6); cx.lineTo(x,LN.A.y+LN.A.h+4); cx.stroke(); }
+  } else { cx.fillStyle='#5A6772'; cx.fillText('データなし',LX+10,LN.A.y+LN.A.h/2); }
+  // minimap
+  const MW=mv.clientWidth, MH=mv.clientHeight; mx.clearRect(0,0,MW,MH); mx.drawImage(miniOff,0,0,MW,MH);
+  if(S){ const D=Math.max(durNow(),10), a=view.t0/D*MW, b=view.t1/D*MW; mx.strokeStyle='#051C2A'; mx.lineWidth=1.5; mx.strokeRect(Math.max(0.75,a),0.75,Math.max(3,b-a),MH-1.5); }
+}
+let drag=null;
+cv.addEventListener('wheel',e=>{ if(!S) return; e.preventDefault(); const tm=tAt(e.offsetX), z=Math.exp(e.deltaY*0.0015), maxD=Math.max(durNow(),10)*1.05;
+  const w=Math.min(maxD,Math.max(3,(view.t1-view.t0)*z)), fr=(tm-view.t0)/(view.t1-view.t0); view.t0=Math.max(0,tm-fr*w); view.t1=view.t0+w; view.follow=false; followBtn(); dirty=true; },{passive:false});
+cv.addEventListener('pointerdown',e=>{ drag={x:e.clientX,t0:view.t0,t1:view.t1,moved:false}; cv.setPointerCapture(e.pointerId); cv.classList.add('drag'); });
+cv.addEventListener('pointermove',e=>{ if(!drag) return; const dx=e.clientX-drag.x; if(Math.abs(dx)>3) drag.moved=true; if(!drag.moved) return;
+  const sp=drag.t1-drag.t0; view.t0=Math.max(0,drag.t0-dx/(cv.clientWidth-LX-8)*sp); view.t1=view.t0+sp; view.follow=false; followBtn(); dirty=true; });
+cv.addEventListener('pointerup',e=>{ cv.classList.remove('drag'); const d=drag; drag=null; if(!d||d.moved||!DV) return;
+  const t=tAt(e.offsetX), ch=e.offsetY<(LN.C.y+LN.C.h+LN.A.y)/2?1:0; let best=null, bd=Infinity;
+  const lo=Math.max(0,lbS(DV.utts,t-60)); for(let i=lo;i<DV.utts.length && DV.utts[i].s<t+60;i++){ const u=DV.utts[i]; if(u.ch!==ch) continue; const d0=t<u.s?u.s-t:t>u.e?t-u.e:0; if(d0<bd){ bd=d0; best=u; } }
+  if(best && bd<1.5) selectUtt(best.id,true,true); });
+cv.addEventListener('dblclick',()=>fitView());
+function miniNav(e){ if(!S) return; const D=Math.max(durNow(),10), t=e.offsetX/mv.clientWidth*D, w=view.t1-view.t0; view.t0=Math.max(0,t-w/2); view.t1=view.t0+w; view.follow=false; followBtn(); dirty=true; }
+let miniDrag=false; mv.addEventListener('pointerdown',e=>{ miniDrag=true; mv.setPointerCapture(e.pointerId); miniNav(e); }); mv.addEventListener('pointermove',e=>{ if(miniDrag) miniNav(e); }); mv.addEventListener('pointerup',()=>miniDrag=false);
+function followBtn(){ $('#btnFollow').hidden=!(L && !view.follow); }
+$('#btnFollow').onclick=()=>{ view.follow=true; view.t1=durNow()+2; view.t0=view.t1-180; followBtn(); };
+function loop(ts){
+  if(L && S){ const q=S.eng.lastQ; $('#mA').style.width=Math.max(0,Math.min(100,(q[0]/100+80)/70*100))+'%'; $('#mC').style.width=Math.max(0,Math.min(100,(q[1]/100+80)/70*100))+'%';
+    $('#clock').textContent=fmtH(durNow()); dirty=true;
+    const b=$('#silBadge'); if(DV?.liveSil){ b.hidden=false; b.textContent=`沈黙 ${f(durNow()-DV.liveSil.s,1)} s`; } else b.hidden=true; }
+  else if(!player.paused) dirty=true;
+  if(ts-lastMini>(L?5000:1e9) || lastMini===0){ lastMini=ts||1; drawMini(); dirty=true; }
+  if(dirty){ draw(); dirty=false; }
+  requestAnimationFrame(loop);
+}
+
+// ---------- init ----------
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ $('#expMenu').open=false; $('#histMenu').open=false; } });
+document.addEventListener('click',e=>{ if(!e.target.closest('#expMenu')) $('#expMenu').open=false; if(!e.target.closest('#histMenu')) $('#histMenu').open=false; });
+$('#histMenu').addEventListener('toggle',()=>{ if($('#histMenu').open) loadHistory(); });
+const _refresh=refresh; refresh=function(){ _refresh(); lastMini=0; };
+(async()=>{
+  sizeCanvas(cv,cx); sizeCanvas(mv,mx); renderPanel(); applyNames(); requestAnimationFrame(loop); refreshDevices(false);
+  const ok=await IDB.open(); if(!ok) toast('ディスク保存 (IndexedDB) が使えない環境です。音声保存は無効、音響特徴はメモリに保持します',8000);
+  else { const all=await IDB.all('sessions').catch(()=>[]); if(all.some(r=>r.status==='recording')) toast('前回の収録が中断されています。「履歴」から復元できます',9000); }
+  renderPanel();
+})();
+})();
+</script>
+</body>
+</html>
